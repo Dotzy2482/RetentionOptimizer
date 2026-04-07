@@ -1,0 +1,50 @@
+/* Main Window */
+QMainWindow {
+    background-color: #f5f6fa;
+}
+
+/* Sidebar */
+#sidebar {
+    background-color: #2c3e50;
+    border-right: 1px solid #233140;
+}
+
+#sidebarTitle {
+    color: #ecf0f1;
+    background-color: #1a252f;
+    padding: 10px;
+    border-bottom: 1px solid #233140;
+}
+
+/* Menu Buttons */
+#menuButton {
+    background-color: transparent;
+    color: #bdc3c7;
+    border: none;
+    text-align: left;
+    padding-left: 25px;
+    font-size: 13px;
+}
+
+#menuButton:hover {
+    background-color: #34495e;
+    color: #ecf0f1;
+}
+
+#menuButton:checked {
+    background-color: #3498db;
+    color: #ffffff;
+    border-left: 3px solid #2ecc71;
+}
+
+/* Version Label */
+#versionLabel {
+    color: #7f8c8d;
+    padding: 10px;
+    font-size: 11px;
+}
+
+/* Content Area */
+QStackedWidget {
+    background-color: #f5f6fa;
+}
