@@ -16,11 +16,14 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
 
 from services.import_service import ImportService, ImportResult
+from services.rfm_service import RFMService
+from services.scoring_service import ScoringService
 
 
 class ImportWorker(QThread):
-    """Background thread for data import."""
+    """Background thread for full pipeline: import -> RFM -> scoring."""
     progress = pyqtSignal(int)
+    status = pyqtSignal(str)
     finished = pyqtSignal(object)  # ImportResult
     error = pyqtSignal(str)
 
@@ -30,8 +33,34 @@ class ImportWorker(QThread):
 
     def run(self):
         try:
+            # Phase 1: Import
+            self.status.emit("Dosya okunuyor...")
             service = ImportService(self.file_path)
-            result = service.run(progress_callback=self.progress.emit)
+            df = service.read_file()
+
+            self.status.emit("Veri temizleniyor...")
+            df, result = service.clean(df)
+
+            self.status.emit("Veritabanina kaydediliyor...")
+            def db_progress(pct):
+                # Scale to 0-60 range for import phase
+                self.progress.emit(int(pct * 0.6))
+            service.load_to_db(df, result, progress_callback=db_progress)
+
+            # Phase 2: RFM
+            self.progress.emit(65)
+            self.status.emit("RFM analizi hesaplaniyor...")
+            rfm_service = RFMService()
+            rfm_service.run()
+
+            # Phase 3: Scoring
+            self.progress.emit(85)
+            self.status.emit("Loyalty score hesaplaniyor...")
+            scoring_service = ScoringService()
+            scoring_service.run()
+
+            self.progress.emit(100)
+            self.status.emit(f"Tamamlandi! {result.customer_count:,} musteri yuklendi")
             self.finished.emit(result)
         except Exception as e:
             self.error.emit(str(e))
@@ -53,6 +82,7 @@ class ImportView(QWidget):
         # Title
         title = QLabel("Veri Yukleme")
         title.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        title.setObjectName("pageTitle")
         layout.addWidget(title)
 
         # File selection
@@ -71,7 +101,7 @@ class ImportView(QWidget):
 
         layout.addWidget(file_group)
 
-        # Import button and progress
+        # Import button, progress, and status
         action_layout = QHBoxLayout()
 
         self.import_btn = QPushButton("Import Baslat")
@@ -83,12 +113,19 @@ class ImportView(QWidget):
         self.import_btn.clicked.connect(self._start_import)
         action_layout.addWidget(self.import_btn)
 
+        progress_layout = QVBoxLayout()
         self.progress_bar = QProgressBar()
-        self.progress_bar.setFixedHeight(30)
+        self.progress_bar.setFixedHeight(25)
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(True)
-        action_layout.addWidget(self.progress_bar, stretch=1)
+        progress_layout.addWidget(self.progress_bar)
 
+        self.status_label = QLabel("")
+        self.status_label.setObjectName("statusLabel")
+        self.status_label.setFont(QFont("Segoe UI", 10))
+        progress_layout.addWidget(self.status_label)
+
+        action_layout.addLayout(progress_layout, stretch=1)
         layout.addLayout(action_layout)
 
         # Summary group
@@ -112,8 +149,10 @@ class ImportView(QWidget):
         for i, (key, label_text) in enumerate(fields):
             label = QLabel(label_text + ":")
             label.setFont(QFont("Segoe UI", 10))
+            label.setObjectName("summaryLabel")
             value = QLabel("-")
             value.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            value.setObjectName("summaryValue")
             value.setAlignment(Qt.AlignmentFlag.AlignRight)
             summary_grid.addWidget(label, i, 0)
             summary_grid.addWidget(value, i, 1)
@@ -137,6 +176,7 @@ class ImportView(QWidget):
             self.import_btn.setEnabled(True)
             self.summary_group.setVisible(False)
             self.progress_bar.setValue(0)
+            self.status_label.setText("")
 
     def _start_import(self):
         if not self._selected_path:
@@ -146,9 +186,11 @@ class ImportView(QWidget):
         self.browse_btn.setEnabled(False)
         self.progress_bar.setValue(0)
         self.summary_group.setVisible(False)
+        self.status_label.setText("Baslatiliyor...")
 
         self._worker = ImportWorker(self._selected_path)
         self._worker.progress.connect(self.progress_bar.setValue)
+        self._worker.status.connect(self.status_label.setText)
         self._worker.finished.connect(self._on_import_done)
         self._worker.error.connect(self._on_import_error)
         self._worker.start()
@@ -167,6 +209,7 @@ class ImportView(QWidget):
 
     def _on_import_error(self, error_msg: str):
         self.progress_bar.setValue(0)
+        self.status_label.setText("Hata olustu!")
         self.import_btn.setEnabled(True)
         self.browse_btn.setEnabled(True)
         QMessageBox.critical(self, "Import Hatasi", f"Veri yuklenirken hata olustu:\n{error_msg}")

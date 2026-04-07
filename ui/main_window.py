@@ -16,9 +16,6 @@ from ui.dashboard_view import DashboardView
 from ui.import_view import ImportView
 from ui.customer_view import CustomerView
 
-from services.rfm_service import RFMService
-from services.scoring_service import ScoringService
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -47,17 +44,18 @@ class MainWindow(QMainWindow):
     def _create_sidebar(self) -> QFrame:
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(220)
+        sidebar.setFixedWidth(240)
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
 
-        # App title
-        title = QLabel(APP_NAME)
+        # App title - word-wrapped to prevent clipping
+        title = QLabel("Retention\nOptimization System")
         title.setObjectName("sidebarTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         title.setFixedHeight(60)
+        title.setWordWrap(True)
         sidebar_layout.addWidget(title)
 
         # Menu items
@@ -99,7 +97,7 @@ class MainWindow(QMainWindow):
         self.dashboard_view = DashboardView()
         self.stack.addWidget(self.dashboard_view)
 
-        # Import
+        # Import - RFM+Scoring now runs inside ImportWorker thread
         self.import_view = ImportView()
         self.import_view.import_completed.connect(self._on_import_completed)
         self.stack.addWidget(self.import_view)
@@ -112,6 +110,7 @@ class MainWindow(QMainWindow):
         seg_page = QWidget()
         seg_layout = QVBoxLayout(seg_page)
         seg_label = QLabel("Segmentasyon - Sprint 3'te gelecek")
+        seg_label.setObjectName("placeholderLabel")
         seg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         seg_label.setFont(QFont("Segoe UI", 16))
         seg_layout.addWidget(seg_label)
@@ -121,6 +120,7 @@ class MainWindow(QMainWindow):
         pred_page = QWidget()
         pred_layout = QVBoxLayout(pred_page)
         pred_label = QLabel("Tahminleme - Sprint 3'te gelecek")
+        pred_label.setObjectName("placeholderLabel")
         pred_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pred_label.setFont(QFont("Segoe UI", 16))
         pred_layout.addWidget(pred_label)
@@ -138,15 +138,6 @@ class MainWindow(QMainWindow):
             self.customer_view.refresh()
 
     def _on_import_completed(self):
-        """Run RFM + Scoring after data import, then refresh views."""
-        try:
-            rfm_service = RFMService()
-            rfm_service.run()
-
-            scoring_service = ScoringService()
-            scoring_service.run()
-        except Exception as e:
-            print(f"[MainWindow] RFM/Scoring error: {e}")
-
+        """Refresh views after import+RFM+scoring pipeline completes."""
         self.dashboard_view.refresh()
         self.customer_view.refresh()

@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QGridLayout,
     QFrame,
     QScrollArea,
     QPushButton,
@@ -21,6 +20,9 @@ from utils.charts import (
     rfm_scatter,
     segment_pie,
 )
+
+LOYALTY_BINS = [0, 25, 50, 75, 100]
+LOYALTY_LABELS = ["Dusuk (0-25)", "Orta (25-50)", "Iyi (50-75)", "Harika (75-100)"]
 
 
 class StatCard(QFrame):
@@ -75,6 +77,7 @@ class DashboardView(QWidget):
         title_row = QHBoxLayout()
         title = QLabel("Dashboard")
         title.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        title.setObjectName("pageTitle")
         title_row.addWidget(title)
         title_row.addStretch()
 
@@ -130,6 +133,17 @@ class DashboardView(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
 
+    def _assign_segments(self, rfm_df: pd.DataFrame) -> pd.DataFrame:
+        """Assign loyalty-based segments to customers."""
+        rfm_df = rfm_df.copy()
+        rfm_df["segment"] = pd.cut(
+            rfm_df["loyalty_score"],
+            bins=LOYALTY_BINS,
+            labels=LOYALTY_LABELS,
+            include_lowest=True,
+        )
+        return rfm_df
+
     def refresh(self):
         """Reload data from database and update all visuals."""
         try:
@@ -146,23 +160,25 @@ class DashboardView(QWidget):
             self.card_worst_segment.set_value("-")
             return
 
+        # Assign loyalty-based segments
+        rfm_df = self._assign_segments(rfm_df)
+
         # Update stat cards
         total = len(rfm_df)
         avg_loyalty = rfm_df["loyalty_score"].mean()
         self.card_customers.set_value(f"{total:,}")
         self.card_avg_loyalty.set_value(f"{avg_loyalty:.1f}")
 
-        # Segment cards
+        # Segment stats - use DB segments if available, otherwise loyalty-based
         if not seg_df.empty:
             seg_avg = seg_df.merge(rfm_df[["customer_id", "loyalty_score"]], on="customer_id")
             seg_stats = seg_avg.groupby("segment_label")["loyalty_score"].mean()
-            if not seg_stats.empty:
-                self.card_best_segment.set_value(seg_stats.idxmax())
-                self.card_worst_segment.set_value(seg_stats.idxmin())
         else:
-            # Auto-segment by loyalty score quartiles for display
-            self.card_best_segment.set_value("-")
-            self.card_worst_segment.set_value("-")
+            seg_stats = rfm_df.groupby("segment")["loyalty_score"].mean()
+
+        if not seg_stats.empty:
+            self.card_best_segment.set_value(str(seg_stats.idxmax()))
+            self.card_worst_segment.set_value(str(seg_stats.idxmin()))
 
         # Loyalty histogram
         loyalty_histogram(rfm_df["loyalty_score"].values, self.hist_fig)
@@ -180,12 +196,7 @@ class DashboardView(QWidget):
         # Segment pie
         if not seg_df.empty:
             counts = seg_df["segment_label"].value_counts()
-            segment_pie(counts.index.tolist(), counts.values.tolist(), self.pie_fig)
         else:
-            # Fallback: loyalty-based grouping
-            bins = [0, 25, 50, 75, 100]
-            labels = ["Dusuk (0-25)", "Orta (25-50)", "Iyi (50-75)", "Harika (75-100)"]
-            rfm_df["group"] = pd.cut(rfm_df["loyalty_score"], bins=bins, labels=labels, include_lowest=True)
-            counts = rfm_df["group"].value_counts().sort_index()
-            segment_pie(counts.index.tolist(), counts.values.tolist(), self.pie_fig)
+            counts = rfm_df["segment"].value_counts().sort_index()
+        segment_pie(counts.index.tolist(), counts.values.tolist(), self.pie_fig)
         self.pie_canvas.draw()

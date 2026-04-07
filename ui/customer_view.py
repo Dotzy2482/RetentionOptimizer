@@ -12,14 +12,15 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QFrame,
     QGridLayout,
-    QGroupBox,
     QPushButton,
     QComboBox,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
 
 from data.database import engine
+
+ROWS_PER_PAGE = 100
 
 
 class CustomerDetailCard(QFrame):
@@ -28,20 +29,13 @@ class CustomerDetailCard(QFrame):
     def __init__(self):
         super().__init__()
         self.setObjectName("detailCard")
-        self.setStyleSheet("""
-            #detailCard {
-                background-color: #ffffff;
-                border: 1px solid #dcdde1;
-                border-radius: 8px;
-                padding: 15px;
-            }
-        """)
         self.setFixedHeight(180)
 
         layout = QGridLayout(self)
         layout.setSpacing(8)
 
         self.title_label = QLabel("Musteri Detayi")
+        self.title_label.setObjectName("detailCardTitle")
         self.title_label.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         layout.addWidget(self.title_label, 0, 0, 1, 4)
 
@@ -60,10 +54,11 @@ class CustomerDetailCard(QFrame):
 
         for key, label_text, row, col in fields:
             lbl = QLabel(f"{label_text}:")
-            lbl.setFont(QFont("Segoe UI", 9))
-            lbl.setStyleSheet("color: #7f8c8d;")
+            lbl.setObjectName("detailLabel")
+            lbl.setFont(QFont("Segoe UI", 10))
             val = QLabel("-")
-            val.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            val.setObjectName("detailValue")
+            val.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
             layout.addWidget(lbl, row, col)
             layout.addWidget(val, row, col + 1)
             self._fields[key] = val
@@ -85,6 +80,8 @@ class CustomerView(QWidget):
     def __init__(self):
         super().__init__()
         self._df = pd.DataFrame()
+        self._filtered_df = pd.DataFrame()
+        self._current_page = 0
         self._setup_ui()
 
     def _setup_ui(self):
@@ -96,6 +93,7 @@ class CustomerView(QWidget):
         title_row = QHBoxLayout()
         title = QLabel("Musteri Listesi")
         title.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        title.setObjectName("pageTitle")
         title_row.addWidget(title)
         title_row.addStretch()
 
@@ -111,14 +109,22 @@ class CustomerView(QWidget):
         filter_layout = QHBoxLayout()
         filter_layout.setSpacing(10)
 
-        filter_layout.addWidget(QLabel("Ara:"))
+        ara_label = QLabel("Ara:")
+        ara_label.setObjectName("filterLabel")
+        ara_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        filter_layout.addWidget(ara_label)
+
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Musteri ID girin...")
         self.search_input.setFixedWidth(200)
-        self.search_input.textChanged.connect(self._apply_filters)
+        self.search_input.textChanged.connect(self._on_filter_changed)
         filter_layout.addWidget(self.search_input)
 
-        filter_layout.addWidget(QLabel("Score Araligi:"))
+        score_label = QLabel("Score Araligi:")
+        score_label.setObjectName("filterLabel")
+        score_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        filter_layout.addWidget(score_label)
+
         self.score_filter = QComboBox()
         self.score_filter.addItems([
             "Tumu",
@@ -128,11 +134,11 @@ class CustomerView(QWidget):
             "75 - 100 (Harika)",
         ])
         self.score_filter.setFixedWidth(160)
-        self.score_filter.currentIndexChanged.connect(self._apply_filters)
+        self.score_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_layout.addWidget(self.score_filter)
 
         self.count_label = QLabel("")
-        self.count_label.setStyleSheet("color: #7f8c8d;")
+        self.count_label.setObjectName("filterLabel")
         filter_layout.addStretch()
         filter_layout.addWidget(self.count_label)
 
@@ -156,6 +162,39 @@ class CustomerView(QWidget):
 
         layout.addWidget(self.table, stretch=1)
 
+        # Pagination bar
+        page_layout = QHBoxLayout()
+        page_layout.setSpacing(10)
+
+        self.btn_first = QPushButton("<<")
+        self.btn_prev = QPushButton("< Onceki")
+        self.page_label = QLabel("Sayfa 1 / 1")
+        self.page_label.setObjectName("filterLabel")
+        self.page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.page_label.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        self.btn_next = QPushButton("Sonraki >")
+        self.btn_last = QPushButton(">>")
+
+        for btn in (self.btn_first, self.btn_prev, self.btn_next, self.btn_last):
+            btn.setFixedWidth(90)
+            btn.setFixedHeight(30)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        self.btn_first.clicked.connect(lambda: self._go_to_page(0))
+        self.btn_prev.clicked.connect(lambda: self._go_to_page(self._current_page - 1))
+        self.btn_next.clicked.connect(lambda: self._go_to_page(self._current_page + 1))
+        self.btn_last.clicked.connect(lambda: self._go_to_page(self._total_pages() - 1))
+
+        page_layout.addStretch()
+        page_layout.addWidget(self.btn_first)
+        page_layout.addWidget(self.btn_prev)
+        page_layout.addWidget(self.page_label)
+        page_layout.addWidget(self.btn_next)
+        page_layout.addWidget(self.btn_last)
+        page_layout.addStretch()
+
+        layout.addLayout(page_layout)
+
         # Detail card
         self.detail_card = CustomerDetailCard()
         layout.addWidget(self.detail_card)
@@ -178,13 +217,18 @@ class CustomerView(QWidget):
         except Exception:
             self._df = pd.DataFrame()
 
+        self._on_filter_changed()
+
+    def _on_filter_changed(self):
+        """Reapply filters and reset to page 0."""
         self._apply_filters()
+        self._current_page = 0
+        self._show_current_page()
 
     def _apply_filters(self):
-        """Filter the dataframe and populate the table."""
+        """Filter the dataframe."""
         if self._df.empty:
-            self.table.setRowCount(0)
-            self.count_label.setText("0 musteri")
+            self._filtered_df = pd.DataFrame()
             return
 
         filtered = self._df.copy()
@@ -205,8 +249,40 @@ class CustomerView(QWidget):
                 (filtered["loyalty_score"] >= low) & (filtered["loyalty_score"] <= high)
             ]
 
-        self._populate_table(filtered)
-        self.count_label.setText(f"{len(filtered):,} musteri")
+        self._filtered_df = filtered.reset_index(drop=True)
+
+    def _total_pages(self) -> int:
+        if self._filtered_df.empty:
+            return 1
+        return max(1, -(-len(self._filtered_df) // ROWS_PER_PAGE))  # ceil division
+
+    def _go_to_page(self, page: int):
+        page = max(0, min(page, self._total_pages() - 1))
+        self._current_page = page
+        self._show_current_page()
+
+    def _show_current_page(self):
+        """Populate the table with only the current page's rows."""
+        total = len(self._filtered_df)
+        total_pages = self._total_pages()
+        self.count_label.setText(f"{total:,} musteri")
+        self.page_label.setText(f"Sayfa {self._current_page + 1} / {total_pages}")
+
+        # Enable/disable buttons
+        self.btn_first.setEnabled(self._current_page > 0)
+        self.btn_prev.setEnabled(self._current_page > 0)
+        self.btn_next.setEnabled(self._current_page < total_pages - 1)
+        self.btn_last.setEnabled(self._current_page < total_pages - 1)
+
+        if self._filtered_df.empty:
+            self.table.setRowCount(0)
+            return
+
+        start = self._current_page * ROWS_PER_PAGE
+        end = min(start + ROWS_PER_PAGE, total)
+        page_df = self._filtered_df.iloc[start:end]
+
+        self._populate_table(page_df)
 
     def _populate_table(self, df: pd.DataFrame):
         self.table.setRowCount(len(df))
@@ -215,19 +291,30 @@ class CustomerView(QWidget):
             "customer_id", "country", "recency", "frequency",
             "monetary", "r_score", "f_score", "loyalty_score",
         ]
+        int_cols = {"customer_id", "recency", "frequency", "r_score", "f_score"}
+
+        # Zebra colors
+        color_even = QColor("#ffffff")
+        color_odd = QColor("#f0f3f7")
 
         for row_idx, (_, row) in enumerate(df.iterrows()):
+            bg = color_even if row_idx % 2 == 0 else color_odd
             for col_idx, col_name in enumerate(columns):
                 value = row.get(col_name, "")
                 if pd.isna(value):
-                    text = "-"
+                    display = "-"
                 elif isinstance(value, float):
-                    text = f"{value:,.2f}"
+                    if col_name in int_cols:
+                        display = str(int(value))
+                    else:
+                        display = f"{value:,.2f}"
                 else:
-                    text = str(int(value)) if col_name in ("customer_id", "recency", "frequency", "r_score", "f_score") else str(value)
+                    display = str(value)
 
-                item = QTableWidgetItem(text)
+                item = QTableWidgetItem(display)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                item.setBackground(bg)
+                item.setForeground(QColor("#2c3e50"))
                 # Store full row data for detail card
                 item.setData(Qt.ItemDataRole.UserRole, row.to_dict())
                 self.table.setItem(row_idx, col_idx, item)
