@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from typing import Optional
 
 from config import DATASET_PATH
@@ -7,60 +6,91 @@ from data.database import get_session, init_db
 from data.repository import CustomerRepository, TransactionRepository
 
 
+class ImportResult:
+    """Holds cleaning/import statistics."""
+    def __init__(self):
+        self.total_raw = 0
+        self.removed_null_customer = 0
+        self.removed_negative_qty = 0
+        self.removed_cancelled = 0
+        self.removed_bad_date = 0
+        self.removed_duplicates = 0
+        self.total_clean = 0
+        self.customer_count = 0
+        self.transaction_count = 0
+
+    @property
+    def total_removed(self) -> int:
+        return self.total_raw - self.total_clean
+
+
 class ImportService:
-    """Reads the Online Retail II Excel file, cleans the data, and loads it into SQLite."""
+    """Reads Excel/CSV retail data, cleans it, and loads into SQLite."""
 
     def __init__(self, file_path: Optional[str] = None):
         self.file_path = file_path or DATASET_PATH
 
-    def read_excel(self) -> pd.DataFrame:
-        """Read all sheets from the Excel file and concatenate them."""
+    def read_file(self) -> pd.DataFrame:
+        """Read Excel (all sheets) or CSV file."""
+        path = self.file_path.lower()
+        if path.endswith(".csv"):
+            return pd.read_csv(self.file_path)
+        # Excel: concat all sheets
         xlsx = pd.ExcelFile(self.file_path)
         frames = [pd.read_excel(xlsx, sheet_name=sheet) for sheet in xlsx.sheet_names]
-        df = pd.concat(frames, ignore_index=True)
-        return df
+        return pd.concat(frames, ignore_index=True)
 
-    def clean(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Clean the raw dataframe:
-        - Drop rows with missing Customer ID
-        - Remove rows with non-positive Quantity (returns/cancellations)
-        - Remove rows with non-positive Price
-        - Parse InvoiceDate to datetime
-        - Strip whitespace from string columns
-        - Drop duplicates
-        """
-        initial_len = len(df)
+    def clean(self, df: pd.DataFrame) -> tuple[pd.DataFrame, ImportResult]:
+        """Clean the raw dataframe and return stats."""
+        result = ImportResult()
+        result.total_raw = len(df)
 
         # Standardize column names
         df.columns = df.columns.str.strip()
 
-        # Drop missing Customer ID
+        # 1. Drop missing Customer ID
+        before = len(df)
         df = df.dropna(subset=["Customer ID"])
+        result.removed_null_customer = before - len(df)
         df["Customer ID"] = df["Customer ID"].astype(int)
 
-        # Filter out non-positive quantities and prices
+        # 2. Filter non-positive Quantity
+        before = len(df)
         df = df[df["Quantity"] > 0]
-        df = df[df["Price"] > 0]
+        result.removed_negative_qty = before - len(df)
 
-        # Parse dates
+        # 3. Filter cancelled invoices (starting with "C")
+        before = len(df)
+        df["Invoice"] = df["Invoice"].astype(str).str.strip()
+        df = df[~df["Invoice"].str.startswith("C")]
+        result.removed_cancelled = before - len(df)
+
+        # 4. Parse dates
+        before = len(df)
         df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"], errors="coerce")
         df = df.dropna(subset=["InvoiceDate"])
+        result.removed_bad_date = before - len(df)
 
-        # Strip string columns
-        for col in ["Invoice", "StockCode", "Description", "Country"]:
+        # 5. Filter non-positive Price
+        df = df[df["Price"] > 0]
+
+        # 6. Strip string columns
+        for col in ["StockCode", "Description", "Country"]:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip()
 
-        # Drop exact duplicates
+        # 7. Drop duplicates
+        before = len(df)
         df = df.drop_duplicates()
+        result.removed_duplicates = before - len(df)
 
-        cleaned_len = len(df)
-        removed = initial_len - cleaned_len
-        print(f"[ImportService] Cleaned: {initial_len} -> {cleaned_len} rows ({removed} removed)")
+        result.total_clean = len(df)
+        result.customer_count = df["Customer ID"].nunique()
 
-        return df.reset_index(drop=True)
+        return df.reset_index(drop=True), result
 
-    def load_to_db(self, df: pd.DataFrame, progress_callback=None):
+    def load_to_db(self, df: pd.DataFrame, result: ImportResult,
+                   progress_callback=None) -> ImportResult:
         """Insert cleaned data into SQLite tables."""
         init_db()
         session = get_session()
@@ -100,6 +130,7 @@ class ImportService:
 
             # Bulk insert transactions
             tx_records = []
+            total_rows = len(df)
             for i, row in df.iterrows():
                 tx_records.append({
                     "invoice_no": str(row["Invoice"]),
@@ -112,7 +143,7 @@ class ImportService:
                 })
 
                 if progress_callback and i % 5000 == 0:
-                    pct = 50 + int((i / len(df)) * 50)
+                    pct = 50 + int((i / total_rows) * 50)
                     progress_callback(pct)
 
             transaction_repo.bulk_insert(tx_records)
@@ -121,8 +152,9 @@ class ImportService:
             if progress_callback:
                 progress_callback(100)
 
-            print(f"[ImportService] Loaded {total_customers} customers, {len(tx_records)} transactions")
-            return total_customers, len(tx_records)
+            result.transaction_count = len(tx_records)
+            result.customer_count = total_customers
+            return result
 
         except Exception:
             session.rollback()
@@ -130,8 +162,8 @@ class ImportService:
         finally:
             session.close()
 
-    def run(self, progress_callback=None) -> tuple[int, int]:
+    def run(self, progress_callback=None) -> ImportResult:
         """Full import pipeline: read -> clean -> load."""
-        df = self.read_excel()
-        df = self.clean(df)
-        return self.load_to_db(df, progress_callback)
+        df = self.read_file()
+        df, result = self.clean(df)
+        return self.load_to_db(df, result, progress_callback)

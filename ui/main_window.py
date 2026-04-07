@@ -11,7 +11,13 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
-from config import APP_NAME, WINDOW_WIDTH, WINDOW_HEIGHT
+from config import APP_NAME, APP_VERSION, WINDOW_WIDTH, WINDOW_HEIGHT
+from ui.dashboard_view import DashboardView
+from ui.import_view import ImportView
+from ui.customer_view import CustomerView
+
+from services.rfm_service import RFMService
+from services.scoring_service import ScoringService
 
 
 class MainWindow(QMainWindow):
@@ -77,7 +83,6 @@ class MainWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         # Version label
-        from config import APP_VERSION
         version_label = QLabel(f"v{APP_VERSION}")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version_label.setObjectName("versionLabel")
@@ -90,18 +95,58 @@ class MainWindow(QMainWindow):
         return sidebar
 
     def _create_pages(self):
-        """Create placeholder pages. Will be replaced with actual views in Sprint 2."""
-        page_names = ["Dashboard", "Veri Yukle", "Musteriler", "Segmentasyon", "Tahminleme"]
-        for name in page_names:
-            page = QWidget()
-            page_layout = QVBoxLayout(page)
-            label = QLabel(f"{name} sayfasi - Sprint 2'de gelecek")
-            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            label.setFont(QFont("Segoe UI", 16))
-            page_layout.addWidget(label)
-            self.stack.addWidget(page)
+        # Dashboard
+        self.dashboard_view = DashboardView()
+        self.stack.addWidget(self.dashboard_view)
+
+        # Import
+        self.import_view = ImportView()
+        self.import_view.import_completed.connect(self._on_import_completed)
+        self.stack.addWidget(self.import_view)
+
+        # Customers
+        self.customer_view = CustomerView()
+        self.stack.addWidget(self.customer_view)
+
+        # Segmentation placeholder
+        seg_page = QWidget()
+        seg_layout = QVBoxLayout(seg_page)
+        seg_label = QLabel("Segmentasyon - Sprint 3'te gelecek")
+        seg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        seg_label.setFont(QFont("Segoe UI", 16))
+        seg_layout.addWidget(seg_label)
+        self.stack.addWidget(seg_page)
+
+        # Prediction placeholder
+        pred_page = QWidget()
+        pred_layout = QVBoxLayout(pred_page)
+        pred_label = QLabel("Tahminleme - Sprint 3'te gelecek")
+        pred_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pred_label.setFont(QFont("Segoe UI", 16))
+        pred_layout.addWidget(pred_label)
+        self.stack.addWidget(pred_page)
 
     def _switch_page(self, index: int):
         self.stack.setCurrentIndex(index)
         for i, btn in enumerate(self.menu_buttons):
             btn.setChecked(i == index)
+
+        # Auto-refresh data views when navigated to
+        if index == 0:
+            self.dashboard_view.refresh()
+        elif index == 2:
+            self.customer_view.refresh()
+
+    def _on_import_completed(self):
+        """Run RFM + Scoring after data import, then refresh views."""
+        try:
+            rfm_service = RFMService()
+            rfm_service.run()
+
+            scoring_service = ScoringService()
+            scoring_service.run()
+        except Exception as e:
+            print(f"[MainWindow] RFM/Scoring error: {e}")
+
+        self.dashboard_view.refresh()
+        self.customer_view.refresh()
