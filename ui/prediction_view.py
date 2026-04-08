@@ -25,13 +25,14 @@ from utils.charts import create_canvas, feature_importance_bar
 ROWS_PER_PAGE = 100
 
 
-def _risk_level(prob: float) -> tuple[str, QColor]:
+def _risk_level(prob: float) -> tuple[str, QColor, QColor]:
+    """Returns (label, text_color, row_background_color)."""
     if prob < 0.3:
-        return "Dusuk", QColor("#2ecc71")
+        return "Dusuk", QColor("#2ecc71"), QColor("#eafaf1")
     elif prob < 0.7:
-        return "Orta", QColor("#f39c12")
+        return "Orta", QColor("#f39c12"), QColor("#fef9e7")
     else:
-        return "Yuksek", QColor("#e74c3c")
+        return "Yuksek", QColor("#e74c3c"), QColor("#fdedec")
 
 
 class PredictionView(QWidget):
@@ -75,7 +76,8 @@ class PredictionView(QWidget):
         metrics_row.setSpacing(15)
 
         # Metrics group
-        metrics_group = QGroupBox("Model Performansi")
+        metrics_group = QGroupBox("Model Performansı")
+        metrics_group.setMinimumWidth(280)
         metrics_grid = QGridLayout(metrics_group)
         self._metric_labels = {}
         metric_names = [
@@ -254,13 +256,10 @@ class PredictionView(QWidget):
         page_df = self._filtered_df.iloc[start:end]
 
         self.table.setRowCount(len(page_df))
-        color_even = QColor("#ffffff")
-        color_odd = QColor("#f0f3f7")
 
         for row_idx, (_, row) in enumerate(page_df.iterrows()):
-            bg = color_even if row_idx % 2 == 0 else color_odd
             churn_prob = row.get("churn_probability", 0) or 0
-            risk_text, risk_color = _risk_level(churn_prob)
+            risk_text, risk_color, risk_bg = _risk_level(churn_prob)
 
             values = [
                 str(int(row["customer_id"])),
@@ -273,7 +272,7 @@ class PredictionView(QWidget):
             for col_idx, val_text in enumerate(values):
                 item = QTableWidgetItem(val_text)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                item.setBackground(bg)
+                item.setBackground(risk_bg)
 
                 if col_idx == 3:  # Risk level column
                     item.setForeground(risk_color)

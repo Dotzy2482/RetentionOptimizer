@@ -50,6 +50,7 @@ class CustomerDetailCard(QFrame):
             ("r_score", "R Score", 4, 0),
             ("f_score", "F Score", 4, 2),
             ("m_score", "M Score", 5, 0),
+            ("segment_label", "Segment", 5, 2),
         ]
 
         for key, label_text, row, col in fields:
@@ -146,10 +147,10 @@ class CustomerView(QWidget):
 
         # Table
         self.table = QTableWidget()
-        self.table.setColumnCount(8)
+        self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels([
             "Musteri ID", "Ulke", "Recency", "Frequency",
-            "Monetary", "R Score", "F Score", "Loyalty Score",
+            "Monetary", "R Score", "F Score", "Segment", "Loyalty Score",
         ])
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
@@ -208,9 +209,11 @@ class CustomerView(QWidget):
                         c.customer_id, c.country,
                         r.recency, r.frequency, r.monetary,
                         r.r_score, r.f_score, r.m_score,
+                        s.segment_label,
                         r.loyalty_score
                     FROM customers c
                     LEFT JOIN rfm_scores r ON c.customer_id = r.customer_id
+                    LEFT JOIN segments s ON c.customer_id = s.customer_id
                     ORDER BY r.loyalty_score DESC
                 """)
                 self._df = pd.read_sql(query, conn)
@@ -289,7 +292,7 @@ class CustomerView(QWidget):
 
         columns = [
             "customer_id", "country", "recency", "frequency",
-            "monetary", "r_score", "f_score", "loyalty_score",
+            "monetary", "r_score", "f_score", "segment_label", "loyalty_score",
         ]
         int_cols = {"customer_id", "recency", "frequency", "r_score", "f_score"}
 

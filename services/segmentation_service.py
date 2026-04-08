@@ -23,6 +23,10 @@ class SegmentationService:
 
         features = rfm_df[["recency", "frequency", "monetary"]].copy()
 
+        # Log-transform skewed features to reduce outlier influence
+        features["frequency"] = np.log1p(features["frequency"])
+        features["monetary"] = np.log1p(features["monetary"])
+
         # Normalize
         scaler = StandardScaler()
         scaled = scaler.fit_transform(features)
@@ -43,8 +47,8 @@ class SegmentationService:
         )
         sorted_clusters = cluster_stats["rank_score"].sort_values().index.tolist()
 
-        # Map: lowest rank -> Low Engagement, mid -> Active, highest -> High Value
-        label_keys = ["low", "mid", "high"]
+        # Map: lowest rank -> Low Engagement, ..., highest -> High Value
+        label_keys = ["low", "mid_low", "mid_high", "high"]
         cluster_to_label = {}
         for i, cluster_id in enumerate(sorted_clusters):
             cluster_to_label[cluster_id] = SEGMENT_LABELS[label_keys[i]]

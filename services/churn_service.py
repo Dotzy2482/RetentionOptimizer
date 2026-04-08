@@ -25,10 +25,13 @@ class ChurnMetrics:
 class ChurnService:
     """XGBoost-based churn prediction model."""
 
+    # recency, r_score, loyalty_score excluded to prevent data leakage
+    # (churn label is defined as recency > threshold, so recency-based
+    # features would give the model the answer directly)
     FEATURE_COLS = [
-        "recency", "frequency", "monetary",
-        "r_score", "f_score", "m_score",
-        "loyalty_score", "aov", "unique_products",
+        "frequency", "monetary",
+        "f_score", "m_score",
+        "aov", "unique_products",
     ]
 
     def _build_features(self) -> pd.DataFrame:

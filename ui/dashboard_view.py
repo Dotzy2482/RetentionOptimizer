@@ -70,8 +70,8 @@ class StatCard(QFrame):
         layout.setContentsMargins(15, 10, 15, 10)
 
         title_label = QLabel(title)
-        title_label.setFont(QFont("Segoe UI", 9))
-        title_label.setStyleSheet("color: #7f8c8d;")
+        title_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #2c3e50;")
         layout.addWidget(title_label)
 
         self.value_label = QLabel(value)

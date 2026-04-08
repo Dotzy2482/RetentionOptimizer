@@ -48,26 +48,27 @@ class RFMService:
 
         rfm["monetary"] = rfm["monetary"].round(2)
 
-        # Quantile-based scoring (1-5)
-        # Recency: lower is better -> reverse labels
+        # Quantile-based scoring (1-5) using rank to avoid duplicate-bin collapse
+        # Recency: lower is better -> reverse labels (5=best, 1=worst)
         rfm["r_score"] = pd.qcut(
-            rfm["recency"], q=RFM_SCORE_BINS, labels=False, duplicates="drop"
-        )
-        rfm["r_score"] = rfm["r_score"].max() - rfm["r_score"] + 1
+            rfm["recency"].rank(method="first"),
+            q=RFM_SCORE_BINS,
+            labels=list(range(RFM_SCORE_BINS, 0, -1)),
+        ).astype(int)
 
-        # Frequency: higher is better
+        # Frequency: higher is better (1=worst, 5=best)
         rfm["f_score"] = pd.qcut(
-            rfm["frequency"], q=RFM_SCORE_BINS, labels=False, duplicates="drop"
-        ) + 1
+            rfm["frequency"].rank(method="first"),
+            q=RFM_SCORE_BINS,
+            labels=list(range(1, RFM_SCORE_BINS + 1)),
+        ).astype(int)
 
-        # Monetary: higher is better
+        # Monetary: higher is better (1=worst, 5=best)
         rfm["m_score"] = pd.qcut(
-            rfm["monetary"], q=RFM_SCORE_BINS, labels=False, duplicates="drop"
-        ) + 1
-
-        # Ensure scores are int
-        for col in ["r_score", "f_score", "m_score"]:
-            rfm[col] = rfm[col].astype(int)
+            rfm["monetary"].rank(method="first"),
+            q=RFM_SCORE_BINS,
+            labels=list(range(1, RFM_SCORE_BINS + 1)),
+        ).astype(int)
 
         return rfm
 
