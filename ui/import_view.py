@@ -18,13 +18,15 @@ from PyQt6.QtGui import QFont
 from services.import_service import ImportService, ImportResult
 from services.rfm_service import RFMService
 from services.scoring_service import ScoringService
+from services.segmentation_service import SegmentationService
+from services.churn_service import ChurnService
 
 
 class ImportWorker(QThread):
-    """Background thread for full pipeline: import -> RFM -> scoring."""
+    """Background thread for full pipeline: import -> RFM -> scoring -> segmentation -> churn."""
     progress = pyqtSignal(int)
     status = pyqtSignal(str)
-    finished = pyqtSignal(object)  # ImportResult
+    finished = pyqtSignal(object, object)  # (ImportResult, ChurnMetrics or None)
     error = pyqtSignal(str)
 
     def __init__(self, file_path: str):
@@ -33,7 +35,7 @@ class ImportWorker(QThread):
 
     def run(self):
         try:
-            # Phase 1: Import
+            # Phase 1: Import (0-40%)
             self.status.emit("Dosya okunuyor...")
             service = ImportService(self.file_path)
             df = service.read_file()
@@ -43,31 +45,65 @@ class ImportWorker(QThread):
 
             self.status.emit("Veritabanina kaydediliyor...")
             def db_progress(pct):
-                # Scale to 0-60 range for import phase
-                self.progress.emit(int(pct * 0.6))
+                self.progress.emit(int(pct * 0.4))
             service.load_to_db(df, result, progress_callback=db_progress)
 
-            # Phase 2: RFM
-            self.progress.emit(65)
+            # Phase 2: RFM (40-55%)
+            self.progress.emit(42)
             self.status.emit("RFM analizi hesaplaniyor...")
-            rfm_service = RFMService()
-            rfm_service.run()
+            RFMService().run()
 
-            # Phase 3: Scoring
-            self.progress.emit(85)
+            # Phase 3: Scoring (55-65%)
+            self.progress.emit(57)
             self.status.emit("Loyalty score hesaplaniyor...")
-            scoring_service = ScoringService()
-            scoring_service.run()
+            ScoringService().run()
+
+            # Phase 4: Segmentation (65-80%)
+            self.progress.emit(67)
+            self.status.emit("K-Means segmentasyon calistiriliyor...")
+            SegmentationService().run()
+
+            # Phase 5: Churn prediction (80-100%)
+            self.progress.emit(82)
+            self.status.emit("Churn modeli egitiliyor ve tahmin yapiliyor...")
+            churn_metrics = ChurnService().run()
 
             self.progress.emit(100)
-            self.status.emit(f"Tamamlandi! {result.customer_count:,} musteri yuklendi")
-            self.finished.emit(result)
+            self.status.emit(
+                f"Tamamlandi! {result.customer_count:,} musteri yuklendi, "
+                f"segmentasyon ve churn analizi yapildi"
+            )
+            self.finished.emit(result, churn_metrics)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class AnalysisWorker(QThread):
+    """Background thread for running only segmentation + churn (no import)."""
+    progress = pyqtSignal(int)
+    status = pyqtSignal(str)
+    finished = pyqtSignal(object)  # ChurnMetrics
+    error = pyqtSignal(str)
+
+    def run(self):
+        try:
+            self.progress.emit(10)
+            self.status.emit("K-Means segmentasyon calistiriliyor...")
+            SegmentationService().run()
+
+            self.progress.emit(50)
+            self.status.emit("Churn modeli egitiliyor ve tahmin yapiliyor...")
+            churn_metrics = ChurnService().run()
+
+            self.progress.emit(100)
+            self.status.emit("Analiz tamamlandi!")
+            self.finished.emit(churn_metrics)
         except Exception as e:
             self.error.emit(str(e))
 
 
 class ImportView(QWidget):
-    import_completed = pyqtSignal()
+    import_completed = pyqtSignal(object)  # emits ChurnMetrics or None
 
     def __init__(self):
         super().__init__()
@@ -101,7 +137,7 @@ class ImportView(QWidget):
 
         layout.addWidget(file_group)
 
-        # Import button, progress, and status
+        # Import button and progress
         action_layout = QHBoxLayout()
 
         self.import_btn = QPushButton("Import Baslat")
@@ -178,12 +214,15 @@ class ImportView(QWidget):
             self.progress_bar.setValue(0)
             self.status_label.setText("")
 
+    def _set_busy(self, busy: bool):
+        self.import_btn.setEnabled(not busy and self._selected_path is not None)
+        self.browse_btn.setEnabled(not busy)
+
     def _start_import(self):
         if not self._selected_path:
             return
 
-        self.import_btn.setEnabled(False)
-        self.browse_btn.setEnabled(False)
+        self._set_busy(True)
         self.progress_bar.setValue(0)
         self.summary_group.setVisible(False)
         self.status_label.setText("Baslatiliyor...")
@@ -195,21 +234,18 @@ class ImportView(QWidget):
         self._worker.error.connect(self._on_import_error)
         self._worker.start()
 
-    def _on_import_done(self, result: ImportResult):
+    def _on_import_done(self, result: ImportResult, churn_metrics):
         self.progress_bar.setValue(100)
-        self.import_btn.setEnabled(True)
-        self.browse_btn.setEnabled(True)
+        self._set_busy(False)
 
-        # Update summary
         for key, label in self._summary_labels.items():
             label.setText(f"{getattr(result, key):,}")
         self.summary_group.setVisible(True)
 
-        self.import_completed.emit()
+        self.import_completed.emit(churn_metrics)
 
     def _on_import_error(self, error_msg: str):
         self.progress_bar.setValue(0)
         self.status_label.setText("Hata olustu!")
-        self.import_btn.setEnabled(True)
-        self.browse_btn.setEnabled(True)
+        self._set_busy(False)
         QMessageBox.critical(self, "Import Hatasi", f"Veri yuklenirken hata olustu:\n{error_msg}")

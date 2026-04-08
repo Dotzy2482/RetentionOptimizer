@@ -22,8 +22,20 @@ RFM_SCORE_BINS = 5
 # Churn threshold (days since last purchase)
 CHURN_THRESHOLD_DAYS = 90
 
+# Segmentation
+N_CLUSTERS = 3
+SEGMENT_LABELS = {
+    "low": "Low Engagement",
+    "mid": "Active Customer",
+    "high": "High Value Loyal",
+}
+
+# Churn model
+MODEL_DIR = os.path.join(BASE_DIR, "models", "trained")
+CHURN_MODEL_PATH = os.path.join(MODEL_DIR, "churn_model.joblib")
+
 # App settings
 APP_NAME = "Retention Optimization System"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 800

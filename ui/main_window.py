@@ -15,6 +15,8 @@ from config import APP_NAME, APP_VERSION, WINDOW_WIDTH, WINDOW_HEIGHT
 from ui.dashboard_view import DashboardView
 from ui.import_view import ImportView
 from ui.customer_view import CustomerView
+from ui.segmentation_view import SegmentationView
+from ui.prediction_view import PredictionView
 
 
 class MainWindow(QMainWindow):
@@ -49,7 +51,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
 
-        # App title - word-wrapped to prevent clipping
+        # App title
         title = QLabel("Retention\nOptimization System")
         title.setObjectName("sidebarTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -95,9 +97,10 @@ class MainWindow(QMainWindow):
     def _create_pages(self):
         # Dashboard
         self.dashboard_view = DashboardView()
+        self.dashboard_view.analysis_completed.connect(self._on_analysis_done)
         self.stack.addWidget(self.dashboard_view)
 
-        # Import - RFM+Scoring now runs inside ImportWorker thread
+        # Import
         self.import_view = ImportView()
         self.import_view.import_completed.connect(self._on_import_completed)
         self.stack.addWidget(self.import_view)
@@ -106,25 +109,13 @@ class MainWindow(QMainWindow):
         self.customer_view = CustomerView()
         self.stack.addWidget(self.customer_view)
 
-        # Segmentation placeholder
-        seg_page = QWidget()
-        seg_layout = QVBoxLayout(seg_page)
-        seg_label = QLabel("Segmentasyon - Sprint 3'te gelecek")
-        seg_label.setObjectName("placeholderLabel")
-        seg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        seg_label.setFont(QFont("Segoe UI", 16))
-        seg_layout.addWidget(seg_label)
-        self.stack.addWidget(seg_page)
+        # Segmentation
+        self.segmentation_view = SegmentationView()
+        self.stack.addWidget(self.segmentation_view)
 
-        # Prediction placeholder
-        pred_page = QWidget()
-        pred_layout = QVBoxLayout(pred_page)
-        pred_label = QLabel("Tahminleme - Sprint 3'te gelecek")
-        pred_label.setObjectName("placeholderLabel")
-        pred_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pred_label.setFont(QFont("Segoe UI", 16))
-        pred_layout.addWidget(pred_label)
-        self.stack.addWidget(pred_page)
+        # Prediction
+        self.prediction_view = PredictionView()
+        self.stack.addWidget(self.prediction_view)
 
     def _switch_page(self, index: int):
         self.stack.setCurrentIndex(index)
@@ -136,8 +127,23 @@ class MainWindow(QMainWindow):
             self.dashboard_view.refresh()
         elif index == 2:
             self.customer_view.refresh()
+        elif index == 3:
+            self.segmentation_view.refresh()
+        elif index == 4:
+            self.prediction_view.refresh()
 
-    def _on_import_completed(self):
-        """Refresh views after import+RFM+scoring pipeline completes."""
+    def _on_import_completed(self, churn_metrics):
+        """Refresh all views after full import pipeline."""
+        if churn_metrics:
+            self.prediction_view.set_metrics(churn_metrics)
         self.dashboard_view.refresh()
         self.customer_view.refresh()
+        self.segmentation_view.refresh()
+        self.prediction_view.refresh()
+
+    def _on_analysis_done(self, churn_metrics):
+        """Refresh views after dashboard 'Analiz Calistir' button."""
+        if churn_metrics:
+            self.prediction_view.set_metrics(churn_metrics)
+        self.segmentation_view.refresh()
+        self.prediction_view.refresh()
