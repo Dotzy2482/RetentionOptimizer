@@ -9,6 +9,8 @@ from PyQt6.QtWidgets import (
     QFrame,
     QScrollArea,
     QPushButton,
+    QFileDialog,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -53,29 +55,21 @@ class AnalysisWorker(QThread):
 
 
 class StatCard(QFrame):
-    def __init__(self, title: str, value: str, color: str = "#3498db"):
+    def __init__(self, title: str, value: str, color: str = "#7C3AED"):
         super().__init__()
         self.setObjectName("statCard")
         self.setFixedHeight(100)
-        self.setStyleSheet(f"""
-            #statCard {{
-                background-color: #ffffff;
-                border-left: 4px solid {color};
-                border-radius: 6px;
-                padding: 10px;
-            }}
-        """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 10, 15, 10)
+        layout.setContentsMargins(18, 12, 18, 12)
 
         title_label = QLabel(title)
-        title_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: #2c3e50;")
+        title_label.setFont(QFont("Segoe UI", 10))
+        title_label.setStyleSheet("color: #6B7280;")
         layout.addWidget(title_label)
 
         self.value_label = QLabel(value)
-        self.value_label.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+        self.value_label.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
         self.value_label.setStyleSheet(f"color: {color};")
         layout.addWidget(self.value_label)
 
@@ -98,8 +92,8 @@ class DashboardView(QWidget):
 
         container = QWidget()
         self.main_layout = QVBoxLayout(container)
-        self.main_layout.setContentsMargins(30, 30, 30, 30)
-        self.main_layout.setSpacing(20)
+        self.main_layout.setContentsMargins(28, 24, 28, 28)
+        self.main_layout.setSpacing(16)
 
         # Title row
         title_row = QHBoxLayout()
@@ -108,6 +102,13 @@ class DashboardView(QWidget):
         title.setObjectName("pageTitle")
         title_row.addWidget(title)
         title_row.addStretch()
+
+        self.export_pdf_btn = QPushButton("PDF Export")
+        self.export_pdf_btn.setObjectName("exportButton")
+        self.export_pdf_btn.setFixedHeight(35)
+        self.export_pdf_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_pdf_btn.clicked.connect(self._export_pdf)
+        title_row.addWidget(self.export_pdf_btn)
 
         self.analysis_btn = QPushButton("Analiz Calistir")
         self.analysis_btn.setObjectName("importButton")
@@ -132,12 +133,12 @@ class DashboardView(QWidget):
 
         # Stat cards
         cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(15)
+        cards_layout.setSpacing(12)
 
-        self.card_customers = StatCard("Toplam Musteri", "-", "#3498db")
-        self.card_avg_loyalty = StatCard("Ort. Loyalty Score", "-", "#2ecc71")
-        self.card_best_segment = StatCard("En Iyi Segment", "-", "#9b59b6")
-        self.card_worst_segment = StatCard("En Dusuk Segment", "-", "#e74c3c")
+        self.card_customers = StatCard("Toplam Musteri", "-", "#7C3AED")
+        self.card_avg_loyalty = StatCard("Ort. Loyalty Score", "-", "#059669")
+        self.card_best_segment = StatCard("En Iyi Segment", "-", "#7C3AED")
+        self.card_worst_segment = StatCard("En Dusuk Segment", "-", "#DC2626")
 
         cards_layout.addWidget(self.card_customers)
         cards_layout.addWidget(self.card_avg_loyalty)
@@ -146,19 +147,19 @@ class DashboardView(QWidget):
 
         self.main_layout.addLayout(cards_layout)
 
-        # Charts - row 1
+        # Charts - row 1: histogram + scatter (equal width)
         charts_row1 = QHBoxLayout()
-        charts_row1.setSpacing(15)
-        self.hist_fig, self.hist_canvas = create_canvas(5, 3.5)
-        self.scatter_fig, self.scatter_canvas = create_canvas(5, 3.5)
+        charts_row1.setSpacing(12)
+        self.hist_fig, self.hist_canvas = create_canvas(6, 3.8)
+        self.scatter_fig, self.scatter_canvas = create_canvas(6, 3.8)
         charts_row1.addWidget(self.hist_canvas)
         charts_row1.addWidget(self.scatter_canvas)
         self.main_layout.addLayout(charts_row1)
 
-        # Charts - row 2
+        # Charts - row 2: pie (half width)
         charts_row2 = QHBoxLayout()
-        charts_row2.setSpacing(15)
-        self.pie_fig, self.pie_canvas = create_canvas(5, 3.5)
+        charts_row2.setSpacing(12)
+        self.pie_fig, self.pie_canvas = create_canvas(6, 3.8)
         charts_row2.addWidget(self.pie_canvas)
         charts_row2.addStretch()
         self.main_layout.addLayout(charts_row2)
@@ -168,6 +169,21 @@ class DashboardView(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
+
+    def _export_pdf(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "PDF Raporu Kaydet", "dashboard_raporu.pdf", "PDF Dosyasi (*.pdf)"
+        )
+        if not path:
+            return
+        try:
+            from utils.export import export_dashboard_pdf
+            export_dashboard_pdf(path)
+            QMessageBox.information(self, "Export Basarili", f"PDF raporu kaydedildi:\n{path}")
+        except PermissionError:
+            QMessageBox.warning(self, "Hata", "Dosya acik. Lutfen kapatip tekrar deneyin.")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Hatasi", str(e))
 
     def _run_analysis(self):
         """Run segmentation + churn in background thread."""
@@ -204,6 +220,18 @@ class DashboardView(QWidget):
             self.card_avg_loyalty.set_value("-")
             self.card_best_segment.set_value("-")
             self.card_worst_segment.set_value("-")
+            # Show empty-state hint on histogram area
+            self.hist_fig.clear()
+            ax = self.hist_fig.add_subplot(111)
+            ax.set_facecolor("#F2F2F7")
+            ax.text(0.5, 0.5, "Henuz veri yuklenmedi.\nVeri Yukle sayfasindan baslayabilirsiniz.",
+                    ha="center", va="center", fontsize=12, color="#9CA3AF",
+                    transform=ax.transAxes)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+            self.hist_canvas.draw()
             return
 
         # Update stat cards

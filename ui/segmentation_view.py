@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QComboBox,
+    QFileDialog,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor
@@ -44,8 +46,8 @@ class SegmentationView(QWidget):
 
         container = QWidget()
         main_layout = QVBoxLayout(container)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(28, 24, 28, 28)
+        main_layout.setSpacing(16)
 
         # Title
         title_row = QHBoxLayout()
@@ -54,6 +56,13 @@ class SegmentationView(QWidget):
         title.setObjectName("pageTitle")
         title_row.addWidget(title)
         title_row.addStretch()
+
+        self.export_btn = QPushButton("Excel Export")
+        self.export_btn.setObjectName("exportButton")
+        self.export_btn.setFixedHeight(35)
+        self.export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_btn.clicked.connect(self._export_excel)
+        title_row.addWidget(self.export_btn)
 
         self.refresh_btn = QPushButton("Yenile")
         self.refresh_btn.setFixedHeight(35)
@@ -69,7 +78,7 @@ class SegmentationView(QWidget):
         self.summary_table.setHorizontalHeaderLabels([
             "Segment", "Musteri Sayisi", "Yuzde (%)", "Ort. Loyalty", "Ort. Churn Risk",
         ])
-        self.summary_table.setFixedHeight(140)
+        self.summary_table.setFixedHeight(170)
         self.summary_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.summary_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.summary_table.verticalHeader().setVisible(False)
@@ -78,20 +87,16 @@ class SegmentationView(QWidget):
 
         # Charts row 1: Pie + RFM bar
         charts_row1 = QHBoxLayout()
-        charts_row1.setSpacing(15)
-        self.pie_fig, self.pie_canvas = create_canvas(5, 3.5)
-        self.bar_fig, self.bar_canvas = create_canvas(5, 3.5)
+        charts_row1.setSpacing(12)
+        self.pie_fig, self.pie_canvas = create_canvas(5.5, 3.8)
+        self.bar_fig, self.bar_canvas = create_canvas(7, 3.8)
         charts_row1.addWidget(self.pie_canvas)
         charts_row1.addWidget(self.bar_canvas)
         main_layout.addLayout(charts_row1)
 
-        # Charts row 2: Scatter
-        charts_row2 = QHBoxLayout()
-        charts_row2.setSpacing(15)
-        self.scatter_fig, self.scatter_canvas = create_canvas(5, 3.5)
-        charts_row2.addWidget(self.scatter_canvas)
-        charts_row2.addStretch()
-        main_layout.addLayout(charts_row2)
+        # Charts row 2: Scatter (full width)
+        self.scatter_fig, self.scatter_canvas = create_canvas(8, 4)
+        main_layout.addWidget(self.scatter_canvas)
 
         # Segment filter + customer table
         filter_row = QHBoxLayout()
@@ -155,6 +160,21 @@ class SegmentationView(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
+
+    def _export_excel(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Excel Raporu Kaydet", "musteri_raporu.xlsx", "Excel Dosyasi (*.xlsx)"
+        )
+        if not path:
+            return
+        try:
+            from utils.export import export_customers_excel
+            count = export_customers_excel(path)
+            QMessageBox.information(self, "Export Basarili", f"{count:,} musteri kaydedildi:\n{path}")
+        except PermissionError:
+            QMessageBox.warning(self, "Hata", "Dosya acik. Lutfen kapatip tekrar deneyin.")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Hatasi", str(e))
 
     def refresh(self):
         """Reload segment data from database."""
@@ -286,8 +306,8 @@ class SegmentationView(QWidget):
         self.cust_table.setRowCount(len(page_df))
         cols = ["customer_id", "segment_label", "recency", "frequency", "monetary", "loyalty_score"]
         int_cols = {"customer_id", "recency", "frequency"}
-        color_even = QColor("#ffffff")
-        color_odd = QColor("#f0f3f7")
+        color_even = QColor("#FFFFFF")
+        color_odd = QColor("#FAFAFA")
 
         for row_idx, (_, row) in enumerate(page_df.iterrows()):
             bg = color_even if row_idx % 2 == 0 else color_odd
@@ -304,5 +324,5 @@ class SegmentationView(QWidget):
                 item = QTableWidgetItem(display)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 item.setBackground(bg)
-                item.setForeground(QColor("#2c3e50"))
+                item.setForeground(QColor("#1C1C1E"))
                 self.cust_table.setItem(row_idx, col_idx, item)

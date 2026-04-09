@@ -15,6 +15,8 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QGridLayout,
     QComboBox,
+    QFileDialog,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor
@@ -28,11 +30,11 @@ ROWS_PER_PAGE = 100
 def _risk_level(prob: float) -> tuple[str, QColor, QColor]:
     """Returns (label, text_color, row_background_color)."""
     if prob < 0.3:
-        return "Dusuk", QColor("#2ecc71"), QColor("#eafaf1")
+        return "Dusuk", QColor("#059669"), QColor("#F0FDF4")
     elif prob < 0.7:
-        return "Orta", QColor("#f39c12"), QColor("#fef9e7")
+        return "Orta", QColor("#D97706"), QColor("#FFFBEB")
     else:
-        return "Yuksek", QColor("#e74c3c"), QColor("#fdedec")
+        return "Yuksek", QColor("#DC2626"), QColor("#FEF2F2")
 
 
 class PredictionView(QWidget):
@@ -52,8 +54,8 @@ class PredictionView(QWidget):
 
         container = QWidget()
         main_layout = QVBoxLayout(container)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(28, 24, 28, 28)
+        main_layout.setSpacing(16)
 
         # Title
         title_row = QHBoxLayout()
@@ -62,6 +64,13 @@ class PredictionView(QWidget):
         title.setObjectName("pageTitle")
         title_row.addWidget(title)
         title_row.addStretch()
+
+        self.export_btn = QPushButton("Excel Export")
+        self.export_btn.setObjectName("exportButton")
+        self.export_btn.setFixedHeight(35)
+        self.export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_btn.clicked.connect(self._export_excel)
+        title_row.addWidget(self.export_btn)
 
         self.refresh_btn = QPushButton("Yenile")
         self.refresh_btn.setFixedHeight(35)
@@ -73,7 +82,7 @@ class PredictionView(QWidget):
 
         # Metrics card + Feature importance side by side
         metrics_row = QHBoxLayout()
-        metrics_row.setSpacing(15)
+        metrics_row.setSpacing(12)
 
         # Metrics group
         metrics_group = QGroupBox("Model Performansı")
@@ -101,7 +110,7 @@ class PredictionView(QWidget):
         metrics_row.addWidget(metrics_group)
 
         # Feature importance chart
-        self.fi_fig, self.fi_canvas = create_canvas(5, 3)
+        self.fi_fig, self.fi_canvas = create_canvas(6, 3.8)
         metrics_row.addWidget(self.fi_canvas)
 
         main_layout.addLayout(metrics_row)
@@ -171,6 +180,21 @@ class PredictionView(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
+
+    def _export_excel(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Excel Raporu Kaydet", "musteri_raporu.xlsx", "Excel Dosyasi (*.xlsx)"
+        )
+        if not path:
+            return
+        try:
+            from utils.export import export_customers_excel
+            count = export_customers_excel(path)
+            QMessageBox.information(self, "Export Basarili", f"{count:,} musteri kaydedildi:\n{path}")
+        except PermissionError:
+            QMessageBox.warning(self, "Hata", "Dosya acik. Lutfen kapatip tekrar deneyin.")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Hatasi", str(e))
 
     def set_metrics(self, metrics):
         """Called after churn model training to display metrics."""
@@ -280,6 +304,6 @@ class PredictionView(QWidget):
                 elif col_idx == 2:  # Churn probability column
                     item.setForeground(risk_color)
                 else:
-                    item.setForeground(QColor("#2c3e50"))
+                    item.setForeground(QColor("#1C1C1E"))
 
                 self.table.setItem(row_idx, col_idx, item)

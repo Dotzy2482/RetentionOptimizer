@@ -14,6 +14,8 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QPushButton,
     QComboBox,
+    QFileDialog,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor
@@ -87,8 +89,8 @@ class CustomerView(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(15)
+        layout.setContentsMargins(28, 24, 28, 28)
+        layout.setSpacing(14)
 
         # Title
         title_row = QHBoxLayout()
@@ -97,6 +99,13 @@ class CustomerView(QWidget):
         title.setObjectName("pageTitle")
         title_row.addWidget(title)
         title_row.addStretch()
+
+        self.export_btn = QPushButton("Excel Export")
+        self.export_btn.setObjectName("exportButton")
+        self.export_btn.setFixedHeight(35)
+        self.export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_btn.clicked.connect(self._export_excel)
+        title_row.addWidget(self.export_btn)
 
         self.refresh_btn = QPushButton("Yenile")
         self.refresh_btn.setFixedHeight(35)
@@ -200,6 +209,21 @@ class CustomerView(QWidget):
         self.detail_card = CustomerDetailCard()
         layout.addWidget(self.detail_card)
 
+    def _export_excel(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Excel Raporu Kaydet", "musteri_raporu.xlsx", "Excel Dosyasi (*.xlsx)"
+        )
+        if not path:
+            return
+        try:
+            from utils.export import export_customers_excel
+            count = export_customers_excel(path)
+            QMessageBox.information(self, "Export Basarili", f"{count:,} musteri kaydedildi:\n{path}")
+        except PermissionError:
+            QMessageBox.warning(self, "Hata", "Dosya acik. Lutfen kapatip tekrar deneyin.")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Hatasi", str(e))
+
     def refresh(self):
         """Reload data from database."""
         try:
@@ -297,8 +321,8 @@ class CustomerView(QWidget):
         int_cols = {"customer_id", "recency", "frequency", "r_score", "f_score"}
 
         # Zebra colors
-        color_even = QColor("#ffffff")
-        color_odd = QColor("#f0f3f7")
+        color_even = QColor("#FFFFFF")
+        color_odd = QColor("#FAFAFA")
 
         for row_idx, (_, row) in enumerate(df.iterrows()):
             bg = color_even if row_idx % 2 == 0 else color_odd
@@ -317,7 +341,7 @@ class CustomerView(QWidget):
                 item = QTableWidgetItem(display)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 item.setBackground(bg)
-                item.setForeground(QColor("#2c3e50"))
+                item.setForeground(QColor("#1C1C1E"))
                 # Store full row data for detail card
                 item.setData(Qt.ItemDataRole.UserRole, row.to_dict())
                 self.table.setItem(row_idx, col_idx, item)

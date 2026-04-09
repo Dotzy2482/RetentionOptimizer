@@ -32,13 +32,27 @@ class ImportService:
 
     def read_file(self) -> pd.DataFrame:
         """Read Excel (all sheets) or CSV file."""
+        import os
+        if not os.path.exists(self.file_path):
+            raise FileNotFoundError(f"Dosya bulunamadi: {self.file_path}")
+
         path = self.file_path.lower()
-        if path.endswith(".csv"):
-            return pd.read_csv(self.file_path)
-        # Excel: concat all sheets
-        xlsx = pd.ExcelFile(self.file_path)
-        frames = [pd.read_excel(xlsx, sheet_name=sheet) for sheet in xlsx.sheet_names]
-        return pd.concat(frames, ignore_index=True)
+        try:
+            if path.endswith(".csv"):
+                df = pd.read_csv(self.file_path)
+            else:
+                xlsx = pd.ExcelFile(self.file_path)
+                frames = [pd.read_excel(xlsx, sheet_name=sheet) for sheet in xlsx.sheet_names]
+                df = pd.concat(frames, ignore_index=True)
+        except Exception as e:
+            raise ValueError(f"Dosya okunamadi. Dosya bozuk veya desteklenmeyen formatta olabilir.\n{e}")
+
+        required_cols = {"Customer ID", "Invoice", "InvoiceDate", "Quantity", "Price"}
+        missing = required_cols - set(df.columns.str.strip())
+        if missing:
+            raise ValueError(f"Dosyada gerekli sutunlar eksik: {', '.join(sorted(missing))}")
+
+        return df
 
     def clean(self, df: pd.DataFrame) -> tuple[pd.DataFrame, ImportResult]:
         """Clean the raw dataframe and return stats."""

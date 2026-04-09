@@ -13,3 +13,5 @@ venv/
 .idea/
 .vscode/
 models/trained/*.joblib
+*.spec.bak
+.pytest_cache/

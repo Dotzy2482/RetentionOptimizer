@@ -112,8 +112,8 @@ class ImportView(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(20)
+        layout.setContentsMargins(28, 24, 28, 28)
+        layout.setSpacing(16)
 
         # Title
         title = QLabel("Veri Yukleme")
@@ -221,6 +221,25 @@ class ImportView(QWidget):
     def _start_import(self):
         if not self._selected_path:
             return
+
+        # Check if DB already has data - warn about overwrite
+        try:
+            from data.database import engine
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                count = conn.execute(text("SELECT COUNT(*) FROM customers")).scalar()
+            if count and count > 0:
+                reply = QMessageBox.question(
+                    self, "Mevcut Veri",
+                    f"Veritabaninda zaten {count:,} musteri var.\n"
+                    "Yeni import mevcut verilerin uzerine yazacaktir.\nDevam etmek istiyor musunuz?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    return
+        except Exception:
+            pass
 
         self._set_busy(True)
         self.progress_bar.setValue(0)

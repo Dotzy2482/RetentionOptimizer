@@ -7,6 +7,8 @@ from PyQt6.QtWidgets import (
     QStackedWidget,
     QLabel,
     QFrame,
+    QDialog,
+    QDialogButtonBox,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -17,6 +19,80 @@ from ui.import_view import ImportView
 from ui.customer_view import CustomerView
 from ui.segmentation_view import SegmentationView
 from ui.prediction_view import PredictionView
+
+
+class AboutDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Hakkinda")
+        self.setFixedSize(420, 340)
+        self.setObjectName("aboutDialog")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 20)
+        layout.setSpacing(12)
+
+        # App icon placeholder - purple circle
+        icon_label = QLabel("ROS")
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setFixedSize(60, 60)
+        icon_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        icon_label.setStyleSheet("""
+            background-color: #7C3AED;
+            color: white;
+            border-radius: 30px;
+        """)
+        icon_container = QHBoxLayout()
+        icon_container.addStretch()
+        icon_container.addWidget(icon_label)
+        icon_container.addStretch()
+        layout.addLayout(icon_container)
+
+        title = QLabel("Retention Optimization System")
+        title.setObjectName("aboutTitle")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        version = QLabel(f"v{APP_VERSION}")
+        version.setObjectName("aboutSubtitle")
+        version.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        version.setFont(QFont("Segoe UI", 11))
+        layout.addWidget(version)
+
+        layout.addSpacing(8)
+
+        info_lines = [
+            ("Gelistiriciler:", "Gamze Bargan & Erva"),
+            ("Teknolojiler:", "Python, PyQt6, Scikit-learn, XGBoost, SQLite"),
+            ("Metodoloji:", "Agile (Sprint tabanli gelistirme)"),
+        ]
+        for label_text, value_text in info_lines:
+            row = QHBoxLayout()
+            lbl = QLabel(label_text)
+            lbl.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            lbl.setStyleSheet("color: #8E8E93;")
+            lbl.setFixedWidth(110)
+            row.addWidget(lbl)
+            val = QLabel(value_text)
+            val.setObjectName("aboutDevLabel")
+            val.setFont(QFont("Segoe UI", 10))
+            val.setWordWrap(True)
+            row.addWidget(val)
+            layout.addLayout(row)
+
+        layout.addSpacing(4)
+        desc = QLabel("Musteri sadakati optimizasyon sistemi.\nRFM analizi, K-Means segmentasyon ve XGBoost churn tahmini.")
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setStyleSheet("color: #8E8E93; font-size: 10px;")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        layout.addStretch()
+
+        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        btn_box.accepted.connect(self.accept)
+        layout.addWidget(btn_box)
 
 
 class MainWindow(QMainWindow):
@@ -55,7 +131,7 @@ class MainWindow(QMainWindow):
         title = QLabel("Retention\nOptimization System")
         title.setObjectName("sidebarTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         title.setFixedHeight(60)
         title.setWordWrap(True)
         sidebar_layout.addWidget(title)
@@ -82,6 +158,14 @@ class MainWindow(QMainWindow):
 
         sidebar_layout.addStretch()
 
+        # About button
+        about_btn = QPushButton("Hakkinda")
+        about_btn.setObjectName("menuButton")
+        about_btn.setFixedHeight(40)
+        about_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        about_btn.clicked.connect(self._show_about)
+        sidebar_layout.addWidget(about_btn)
+
         # Version label
         version_label = QLabel(f"v{APP_VERSION}")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -93,6 +177,10 @@ class MainWindow(QMainWindow):
             self.menu_buttons[0].setChecked(True)
 
         return sidebar
+
+    def _show_about(self):
+        dialog = AboutDialog(self)
+        dialog.exec()
 
     def _create_pages(self):
         # Dashboard

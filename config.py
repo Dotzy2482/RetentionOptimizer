@@ -37,6 +37,6 @@ CHURN_MODEL_PATH = os.path.join(MODEL_DIR, "churn_model.joblib")
 
 # App settings
 APP_NAME = "Retention Optimization System"
-APP_VERSION = "0.3.0"
+APP_VERSION = "1.0.0"
 WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 800
