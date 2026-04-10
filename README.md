@@ -2,11 +2,6 @@
 
 Musteri sadakati optimizasyon sistemi. RFM analizi, K-Means segmentasyon ve XGBoost churn tahmini ile musterilerin elde tutulmasini optimize eder.
 
-## Gelistiriciler
-
-- **Gamze Bargan**
-- **Erva**
-
 ## Teknolojiler
 
 - Python 3.11+
