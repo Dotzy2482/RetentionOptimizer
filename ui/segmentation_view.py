@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QScrollArea,
     QPushButton,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
@@ -43,6 +44,9 @@ class SegmentationView(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.verticalScrollBar().setSingleStep(24)
 
         container = QWidget()
         main_layout = QVBoxLayout(container)
@@ -85,18 +89,35 @@ class SegmentationView(QWidget):
         self.summary_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         main_layout.addWidget(self.summary_table)
 
-        # Charts row 1: Pie + RFM bar
-        charts_row1 = QHBoxLayout()
-        charts_row1.setSpacing(12)
-        self.pie_fig, self.pie_canvas = create_canvas(5.5, 3.8)
-        self.bar_fig, self.bar_canvas = create_canvas(7, 3.8)
-        charts_row1.addWidget(self.pie_canvas)
-        charts_row1.addWidget(self.bar_canvas)
-        main_layout.addLayout(charts_row1)
+        # Charts — stacked vertically, each large and readable.
+        # Fixed vertical size policy ensures QScrollArea can compute the
+        # total content height deterministically (prevents scroll jitter).
+        main_layout.addSpacing(8)
 
-        # Charts row 2: Scatter (full width)
-        self.scatter_fig, self.scatter_canvas = create_canvas(8, 4)
+        chart_policy = QSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+
+        self.pie_fig, self.pie_canvas = create_canvas(10, 5)
+        self.pie_canvas.setFixedHeight(500)
+        self.pie_canvas.setSizePolicy(chart_policy)
+        main_layout.addWidget(self.pie_canvas)
+
+        main_layout.addSpacing(12)
+
+        self.bar_fig, self.bar_canvas = create_canvas(11, 8.5)
+        self.bar_canvas.setFixedHeight(720)
+        self.bar_canvas.setSizePolicy(chart_policy)
+        main_layout.addWidget(self.bar_canvas)
+
+        main_layout.addSpacing(12)
+
+        self.scatter_fig, self.scatter_canvas = create_canvas(12, 5.5)
+        self.scatter_canvas.setFixedHeight(540)
+        self.scatter_canvas.setSizePolicy(chart_policy)
         main_layout.addWidget(self.scatter_canvas)
+
+        main_layout.addSpacing(8)
 
         # Segment filter + customer table
         filter_row = QHBoxLayout()

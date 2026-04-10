@@ -63,7 +63,6 @@ class AboutDialog(QDialog):
         layout.addSpacing(8)
 
         info_lines = [
-            ("Gelistiriciler:", "Gamze Bargan & Erva"),
             ("Teknolojiler:", "Python, PyQt6, Scikit-learn, XGBoost, SQLite"),
             ("Metodoloji:", "Agile (Sprint tabanli gelistirme)"),
         ]
@@ -104,10 +103,10 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setContentsMargins(12, 12, 0, 12)
+        layout.setSpacing(12)
 
-        # Left sidebar
+        # Left sidebar (floating)
         sidebar = self._create_sidebar()
         layout.addWidget(sidebar)
 
