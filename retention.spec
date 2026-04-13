@@ -8,9 +8,13 @@ block_cipher = None
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=[
+        (r'C:\Users\kayas\AppData\Roaming\Python\Python314\site-packages\xgboost\lib\xgboost.dll', 'xgboost/lib'),
+    ],
     datas=[
         ('assets/styles.qss', 'assets'),
+        ('datasets', 'datasets'),
+        (r'C:\Users\kayas\AppData\Roaming\Python\Python314\site-packages\xgboost\VERSION', 'xgboost'),
     ],
     hiddenimports=[
         'sklearn.utils._typedefs',
@@ -19,7 +23,14 @@ a = Analysis(
         'sklearn.utils._vector_sentinel',
         'sklearn.neighbors._partition_nodes',
         'xgboost',
+        'xgboost.sklearn',
+        'xgboost.training',
         'sqlalchemy.dialects.sqlite',
+        'openpyxl',
+        'openpyxl.styles',
+        'openpyxl.utils',
+        'openpyxl.workbook',
+        'openpyxl.reader.excel',
     ],
     hookspath=[],
     hooksconfig={},

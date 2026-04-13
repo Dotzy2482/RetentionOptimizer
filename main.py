@@ -95,6 +95,15 @@ class SplashScreen(QWidget):
         """)
 
 
+def _get_log_path():
+    """Return a log file path next to the exe (or source file in dev mode)."""
+    if getattr(sys, "frozen", False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, "startup_error.log")
+
+
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
@@ -123,6 +132,12 @@ def main():
             app._main_window = window
         except Exception:
             err = traceback.format_exc()
+            # Write error to log file so we can diagnose EXE issues
+            try:
+                with open(_get_log_path(), "w", encoding="utf-8") as f:
+                    f.write(err)
+            except Exception:
+                pass
             QMessageBox.critical(
                 None,
                 "Baslatma Hatasi",
@@ -140,3 +155,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
