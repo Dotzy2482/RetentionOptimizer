@@ -1,13 +1,42 @@
 import os
+import sys
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Database
-DB_PATH = os.path.join(BASE_DIR, "data", "retention.db")
+def _get_app_dir() -> str:
+    """Return the directory that should be used for writable app data (db, models).
+
+    * When running as a PyInstaller bundle  → directory that contains the .exe
+    * When running from source              → directory that contains this file
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def _get_resource_dir() -> str:
+    """Return the directory where read-only bundled assets live.
+
+    * PyInstaller extracts assets to sys._MEIPASS at runtime.
+    * In source mode this is the same as the project root.
+    """
+    if getattr(sys, "frozen", False):
+        return sys._MEIPASS  # type: ignore[attr-defined]
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+APP_DIR = _get_app_dir()
+RESOURCE_DIR = _get_resource_dir()
+
+# Ensure writable data sub-directory exists
+_data_dir = os.path.join(APP_DIR, "data")
+os.makedirs(_data_dir, exist_ok=True)
+
+# Database  (written next to the exe so it persists across runs)
+DB_PATH = os.path.join(_data_dir, "retention.db")
 DB_URL = f"sqlite:///{DB_PATH}"
 
-# Dataset
-DATASET_PATH = os.path.join(BASE_DIR, "datasets", "online_retail_II.xlsx")
+# Dataset  (read-only; bundled inside the exe or in the source tree)
+DATASET_PATH = os.path.join(RESOURCE_DIR, "datasets", "online_retail_II.xlsx")
 
 # RFM weights for loyalty score calculation
 RFM_WEIGHTS = {
@@ -31,8 +60,9 @@ SEGMENT_LABELS = {
     "high": "High Value Loyal",
 }
 
-# Churn model
-MODEL_DIR = os.path.join(BASE_DIR, "models", "trained")
+# Churn model  (written next to the exe so trained models persist)
+MODEL_DIR = os.path.join(APP_DIR, "models", "trained")
+os.makedirs(MODEL_DIR, exist_ok=True)
 CHURN_MODEL_PATH = os.path.join(MODEL_DIR, "churn_model.joblib")
 
 # App settings

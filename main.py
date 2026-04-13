@@ -1,19 +1,22 @@
 import sys
 import os
+import traceback
 
-# Ensure project root is on the path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# In source mode, ensure the project root is importable.
+# PyInstaller bundles all modules itself, so we skip this when frozen.
+if not getattr(sys, "frozen", False):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar, QMessageBox
 from PyQt6.QtCore import QFile, QTextStream, Qt, QTimer
 from PyQt6.QtGui import QFont
 
 from data.database import init_db
-from config import APP_NAME, APP_VERSION
+from config import APP_NAME, APP_VERSION, RESOURCE_DIR
 
 
 def load_stylesheet(app: QApplication):
-    style_path = os.path.join(os.path.dirname(__file__), "assets", "styles.qss")
+    style_path = os.path.join(RESOURCE_DIR, "assets", "styles.qss")
     file = QFile(style_path)
     if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
         stream = QTextStream(file)
@@ -93,16 +96,13 @@ class SplashScreen(QWidget):
 
 
 def main():
-    init_db()
-
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
 
     load_stylesheet(app)
 
-    # Show splash
+    # Show splash screen immediately
     splash = SplashScreen()
-    # Center on screen
     screen = app.primaryScreen().geometry()
     splash.move(
         (screen.width() - splash.width()) // 2,
@@ -111,16 +111,29 @@ def main():
     splash.show()
     app.processEvents()
 
-    # Load main window after a short delay
     def show_main():
-        from ui.main_window import MainWindow
-        window = MainWindow()
-        window.show()
-        splash.close()
-        # Keep reference so window isn't garbage collected
-        app._main_window = window
+        """Initialize DB and launch the main window; always closes the splash."""
+        try:
+            init_db()
 
-    QTimer.singleShot(2000, show_main)
+            from ui.main_window import MainWindow
+            window = MainWindow()
+            window.show()
+            # Keep a strong reference on the app so the GC cannot collect the window.
+            app._main_window = window
+        except Exception:
+            err = traceback.format_exc()
+            QMessageBox.critical(
+                None,
+                "Baslatma Hatasi",
+                f"Uygulama baslatilirken beklenmeyen bir hata olustu:\n\n{err}",
+            )
+            app.quit()
+        finally:
+            # Splash must always close regardless of success or failure.
+            splash.close()
+
+    QTimer.singleShot(1500, show_main)
 
     sys.exit(app.exec())
 
