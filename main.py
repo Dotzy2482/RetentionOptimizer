@@ -10,7 +10,7 @@ if not getattr(sys, "frozen", False):
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QMessageBox
 from PyQt6.QtCore import (QFile, QTextStream, Qt, QTimer, QPropertyAnimation,
                           QEasingCurve, QRectF, pyqtProperty)
-from PyQt6.QtGui import QFont, QPainter, QColor, QPainterPath, QLinearGradient, QRadialGradient, QBrush
+from PyQt6.QtGui import QFont, QPainter, QPen, QColor, QPainterPath, QLinearGradient, QRadialGradient, QBrush
 
 from data.database import init_db
 from config import APP_NAME, APP_VERSION, RESOURCE_DIR
@@ -33,36 +33,41 @@ class LogoWidget(QWidget):
     def __init__(self, size: int = 70, parent=None):
         super().__init__(parent)
         self.setFixedSize(size, size)
-        self._sz = size
+
+        # Pre-compute everything once — nothing is created during paintEvent
+        sz = float(size)
+        r  = sz / 2.0
+
+        grad = QRadialGradient(r * 0.55, r * 0.45, r * 1.1)
+        grad.setColorAt(0.0, QColor("#9333EA"))
+        grad.setColorAt(0.5, QColor("#7C3AED"))
+        grad.setColorAt(1.0, QColor("#5B21B6"))
+        self._grad_brush = QBrush(grad)
+
+        shine = QRadialGradient(r * 0.38, r * 0.30, r * 0.65)
+        shine.setColorAt(0.0, QColor(255, 255, 255, 55))
+        shine.setColorAt(1.0, QColor(255, 255, 255, 0))
+        self._shine_brush = QBrush(shine)
+
+        self._circle_rect = QRectF(0, 0, sz, sz)
+        self._font        = QFont("Bahnschrift", int(r * 0.46), QFont.Weight.Bold)
+        self._text_color  = QColor(255, 255, 255, 235)
+        self._no_pen      = Qt.PenStyle.NoPen
 
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        sz = float(self._sz)
-        r = sz / 2.0
+        p.setPen(self._no_pen)
+        p.setBrush(self._grad_brush)
+        p.drawEllipse(self._circle_rect)
 
-        # Main gradient fill — top-left light, bottom-right deep
-        grad = QRadialGradient(r * 0.55, r * 0.45, r * 1.1)
-        grad.setColorAt(0.0, QColor("#9333EA"))
-        grad.setColorAt(0.5, QColor("#7C3AED"))
-        grad.setColorAt(1.0, QColor("#5B21B6"))
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(grad))
-        p.drawEllipse(QRectF(0, 0, sz, sz))
+        p.setBrush(self._shine_brush)
+        p.drawEllipse(self._circle_rect)
 
-        # Glass shine — top-left quarter highlight
-        shine = QRadialGradient(r * 0.38, r * 0.30, r * 0.65)
-        shine.setColorAt(0.0, QColor(255, 255, 255, 55))
-        shine.setColorAt(1.0, QColor(255, 255, 255, 0))
-        p.setBrush(QBrush(shine))
-        p.drawEllipse(QRectF(0, 0, sz, sz))
-
-        # "ROS" text
-        font = QFont("Bahnschrift", int(r * 0.46), QFont.Weight.Bold)
-        p.setFont(font)
-        p.setPen(QColor(255, 255, 255, 235))
-        p.drawText(QRectF(0, 0, sz, sz), Qt.AlignmentFlag.AlignCenter, "ROS")
+        p.setFont(self._font)
+        p.setPen(self._text_color)
+        p.drawText(self._circle_rect, Qt.AlignmentFlag.AlignCenter, "ROS")
 
 
 # ---------------------------------------------------------------------------
@@ -72,11 +77,21 @@ class LogoWidget(QWidget):
 class SegmentedProgress(QWidget):
     def __init__(self, segments: int = 5, parent=None):
         super().__init__(parent)
-        self._segments = segments
-        self._val = 0.0
-        self._anim = None
+        self._segments  = segments
+        self._val       = 0.0
+        self._anim      = None
+        self._built     = False
+        # Caches filled by _rebuild() on first resize
+        self._pill_paths:  list[QPainterPath] = []
+        self._grad_brushes: list[QBrush]      = []
+        self._shine_brushes: list[QBrush]     = []
+        self._seg_xs:  list[float]            = []
+        self._seg_w    = 0.0
+        self._h        = 0.0
+        self._bg_color = QColor(180, 180, 185, 120)
         self.setFixedHeight(8)
 
+    # ── Qt property (needed by QPropertyAnimation) ────────────
     @pyqtProperty(float)
     def value(self):
         return self._val
@@ -86,7 +101,51 @@ class SegmentedProgress(QWidget):
         self._val = v
         self.update()
 
+    # ── Cache rebuild — called once when the widget gets its size
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.width() > 0:
+            self._rebuild()
+
+    def _rebuild(self):
+        w      = float(self.width())
+        h      = float(self.height())
+        gap    = 7.0
+        seg_w  = (w - gap * (self._segments - 1)) / self._segments
+        radius = h / 2.0
+
+        self._seg_w = seg_w
+        self._h     = h
+        self._seg_xs.clear()
+        self._pill_paths.clear()
+        self._grad_brushes.clear()
+        self._shine_brushes.clear()
+
+        for i in range(self._segments):
+            x = i * (seg_w + gap)
+            self._seg_xs.append(x)
+
+            path = QPainterPath()
+            path.addRoundedRect(QRectF(x, 0.0, seg_w, h), radius, radius)
+            self._pill_paths.append(path)
+
+            grad = QLinearGradient(x, 0.0, x + seg_w, 0.0)
+            grad.setColorAt(0.0, QColor("#6D28D9"))
+            grad.setColorAt(0.5, QColor("#7C3AED"))
+            grad.setColorAt(1.0, QColor("#8B5CF6"))
+            self._grad_brushes.append(QBrush(grad))
+
+            shine = QLinearGradient(x, 0.0, x, h)
+            shine.setColorAt(0.0, QColor(255, 255, 255, 70))
+            shine.setColorAt(0.5, QColor(255, 255, 255, 0))
+            self._shine_brushes.append(QBrush(shine))
+
+        self._built = True
+
+    # ── Animation ─────────────────────────────────────────────
     def animateTo(self, target: float):
+        if self._anim is not None:
+            self._anim.stop()
         self._anim = QPropertyAnimation(self, b"value")
         self._anim.setDuration(260)
         self._anim.setStartValue(self._val)
@@ -94,45 +153,28 @@ class SegmentedProgress(QWidget):
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._anim.start()
 
+    # ── Paint — uses only pre-built objects ───────────────────
     def paintEvent(self, event):
+        if not self._built:
+            return
+
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        w = float(self.width())
-        h = float(self.height())
-        gap = 7.0
-        seg_w = (w - gap * (self._segments - 1)) / self._segments
-        radius = h / 2.0
+        seg_w = self._seg_w
+        h     = self._h
 
         for i in range(self._segments):
-            x = i * (seg_w + gap)
+            x    = self._seg_xs[i]
             fill = max(0.0, min(1.0, self._val - i))
 
-            # Inactive pill — light gray
-            bg = QPainterPath()
-            bg.addRoundedRect(QRectF(x, 0.0, seg_w, h), radius, radius)
-            p.fillPath(bg, QColor(180, 180, 185, 120))
+            p.fillPath(self._pill_paths[i], self._bg_color)
 
             if fill > 0.001:
-                # Clip to filled width, draw full pill shape so edges stay round
                 p.save()
                 p.setClipRect(QRectF(x, 0.0, seg_w * fill, h))
-
-                grad = QLinearGradient(x, 0.0, x + seg_w, 0.0)
-                grad.setColorAt(0.0, QColor("#6D28D9"))
-                grad.setColorAt(0.5, QColor("#7C3AED"))
-                grad.setColorAt(1.0, QColor("#8B5CF6"))
-
-                pill = QPainterPath()
-                pill.addRoundedRect(QRectF(x, 0.0, seg_w, h), radius, radius)
-                p.fillPath(pill, QBrush(grad))
-
-                # Subtle top-edge shine
-                shine = QLinearGradient(x, 0.0, x, h)
-                shine.setColorAt(0.0, QColor(255, 255, 255, 70))
-                shine.setColorAt(0.5, QColor(255, 255, 255, 0))
-                p.fillPath(pill, QBrush(shine))
-
+                p.fillPath(self._pill_paths[i], self._grad_brushes[i])
+                p.fillPath(self._pill_paths[i], self._shine_brushes[i])
                 p.restore()
 
 

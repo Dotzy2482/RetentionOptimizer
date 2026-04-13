@@ -9,11 +9,106 @@ from PyQt6.QtWidgets import (
     QFrame,
     QDialog,
     QDialogButtonBox,
+    QAbstractButton,
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QRectF
+from PyQt6.QtGui import QFont, QPainter, QColor, QPainterPath
 
 from config import APP_NAME, APP_VERSION, WINDOW_WIDTH, WINDOW_HEIGHT
+
+
+# ---------------------------------------------------------------------------
+# NavButton — icon + text sidebar button with left accent bar when active
+# ---------------------------------------------------------------------------
+
+class NavButton(QAbstractButton):
+    """Custom sidebar nav item: Segoe MDL2 icon, label, hover fill, active accent."""
+
+    def __init__(self, icon_char: str, label: str, checkable: bool = True, parent=None):
+        super().__init__(parent)
+        self._icon    = icon_char
+        self._label   = label
+        self._hovered = False
+        self.setCheckable(checkable)
+        self.setFixedHeight(44)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Pre-build fonts (created once, reused every frame)
+        self._font_normal = QFont("Segoe UI", 13)
+        self._font_bold   = QFont("Segoe UI", 13)
+        self._font_bold.setBold(True)
+        self._font_icon   = QFont("Segoe MDL2 Assets", 13)
+
+        # Pre-build colors
+        self._col_purple     = QColor(124, 58, 237)
+        self._col_bg_checked = QColor(124, 58, 237, 25)
+        self._col_bg_hover   = QColor(124, 58, 237, 14)
+        self._col_txt_active = QColor(124, 58, 237)
+        self._col_txt_hover  = QColor(107, 114, 128)
+        self._col_txt_normal = QColor(55, 65, 81)
+        self._col_icn_active = QColor(124, 58, 237)
+        self._col_icn_inact  = QColor(156, 163, 175)
+
+        # Geometry paths — built in resizeEvent (size unknown at __init__)
+        self._bg_path   = QPainterPath()
+        self._bar_path  = QPainterPath()
+        self._icon_rect = QRectF()
+        self._text_rect = QRectF()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        w, h = float(self.width()), float(self.height())
+        if w == 0 or h == 0:
+            return
+        mx, my = 10.0, 2.0
+
+        self._bg_path = QPainterPath()
+        self._bg_path.addRoundedRect(QRectF(mx, my, w - mx * 2, h - my * 2), 8, 8)
+
+        self._bar_path = QPainterPath()
+        self._bar_path.addRoundedRect(QRectF(mx, h * 0.22, 3, h * 0.56), 1.5, 1.5)
+
+        self._icon_rect = QRectF(mx + 12, 0.0, 24.0, h)
+        text_x          = mx + 12 + 24 + 10
+        self._text_rect = QRectF(text_x, 0.0, w - text_x - mx, h)
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        checked = self.isChecked()
+
+        # Background pill
+        if checked:
+            p.fillPath(self._bg_path, self._col_bg_checked)
+        elif self._hovered:
+            p.fillPath(self._bg_path, self._col_bg_hover)
+
+        # Left accent bar when active
+        if checked:
+            p.fillPath(self._bar_path, self._col_purple)
+
+        # Icon
+        p.setPen(self._col_icn_active if (checked or self._hovered) else self._col_icn_inact)
+        p.setFont(self._font_icon)
+        p.drawText(self._icon_rect, Qt.AlignmentFlag.AlignCenter, self._icon)
+
+        # Label
+        p.setPen(self._col_txt_active if checked
+                 else self._col_txt_hover if self._hovered
+                 else self._col_txt_normal)
+        p.setFont(self._font_bold if checked else self._font_normal)
+        p.drawText(self._text_rect, Qt.AlignmentFlag.AlignVCenter, self._label)
 from ui.dashboard_view import DashboardView
 from ui.import_view import ImportView
 from ui.customer_view import CustomerView
@@ -126,46 +221,69 @@ class MainWindow(QMainWindow):
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
 
-        # App title
-        title = QLabel("Retention\nOptimization System")
-        title.setObjectName("sidebarTitle")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        title.setFixedHeight(60)
-        title.setWordWrap(True)
-        sidebar_layout.addWidget(title)
+        # ── Brand header ──────────────────────────────────────
+        brand_container = QWidget()
+        brand_container.setFixedHeight(80)
+        brand_container.setStyleSheet("background: transparent;")
+        brand_layout = QVBoxLayout(brand_container)
+        brand_layout.setContentsMargins(0, 14, 0, 8)
+        brand_layout.setSpacing(5)
 
-        # Menu items
-        menu_items = [
-            ("Dashboard", 0),
-            ("Veri Yukle", 1),
-            ("Musteriler", 2),
-            ("Segmentasyon", 3),
-            ("Tahminleme", 4),
+        brand_icon = QLabel("ROS")
+        brand_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        brand_icon.setFixedSize(38, 38)
+        brand_icon.setFont(QFont("Bahnschrift", 11, QFont.Weight.Bold))
+        brand_icon.setStyleSheet("""
+            background: qradialgradient(cx:0.4, cy:0.4, radius:0.9, fx:0.4, fy:0.4,
+                stop:0 #9333EA, stop:0.5 #7C3AED, stop:1 #5B21B6);
+            color: white;
+            border-radius: 19px;
+        """)
+        icon_row = QHBoxLayout()
+        icon_row.addStretch()
+        icon_row.addWidget(brand_icon)
+        icon_row.addStretch()
+        brand_layout.addLayout(icon_row)
+
+        brand_title = QLabel("Retention Optimizer")
+        brand_title.setObjectName("sidebarTitle")
+        brand_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        brand_title.setFont(QFont("Bahnschrift", 10, QFont.Weight.Bold))
+        brand_layout.addWidget(brand_title)
+
+        sidebar_layout.addWidget(brand_container)
+
+        # ── Nav items ─────────────────────────────────────────
+        nav_items = [
+            ("\uE80F", "Dashboard",    0),
+            ("\uE896", "Veri Yukle",   1),
+            ("\uE716", "Musteriler",   2),
+            ("\uE9D2", "Segmentasyon", 3),
+            ("\uE9F9", "Tahminleme",   4),
         ]
 
-        self.menu_buttons: list[QPushButton] = []
-        for label, index in menu_items:
-            btn = QPushButton(label)
-            btn.setObjectName("menuButton")
-            btn.setFixedHeight(45)
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setCheckable(True)
+        self.menu_buttons: list[NavButton] = []
+        for icon, label, index in nav_items:
+            btn = NavButton(icon, label)
             btn.clicked.connect(lambda checked, idx=index: self._switch_page(idx))
             sidebar_layout.addWidget(btn)
             self.menu_buttons.append(btn)
 
         sidebar_layout.addStretch()
 
-        # About button
-        about_btn = QPushButton("Hakkinda")
-        about_btn.setObjectName("menuButton")
-        about_btn.setFixedHeight(40)
-        about_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        # ── Separator ─────────────────────────────────────────
+        sep = QFrame()
+        sep.setObjectName("sidebarSep")
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFixedHeight(1)
+        sidebar_layout.addWidget(sep)
+
+        # ── About button ──────────────────────────────────────
+        about_btn = NavButton("\uE946", "Hakkinda", checkable=False)
         about_btn.clicked.connect(self._show_about)
         sidebar_layout.addWidget(about_btn)
 
-        # Version label
+        # ── Version label ─────────────────────────────────────
         version_label = QLabel(f"v{APP_VERSION}")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version_label.setObjectName("versionLabel")
