@@ -63,6 +63,40 @@ def create_canvas(width=6, height=4, dpi=100) -> tuple[Figure, FigureCanvas]:
     return fig, canvas
 
 
+def _apply_tight_layout(fig: Figure, **tight_kwargs):
+    """Apply tight_layout now AND re-apply whenever the canvas resizes.
+
+    Custom rect-based layouts bake positions at a specific figure size;
+    when the canvas is resized (e.g. page switch, window resize) text
+    elements keep their physical size and the baked positions become
+    wrong. Re-running tight_layout on every resize fixes this.
+    """
+    try:
+        fig.tight_layout(**tight_kwargs)
+    except Exception:
+        pass
+
+    # Replace any prior resize listener registered by this helper so
+    # repeated refreshes don't accumulate callbacks.
+    prev_cid = getattr(fig, "_tight_resize_cid", None)
+    if prev_cid is not None:
+        try:
+            fig.canvas.mpl_disconnect(prev_cid)
+        except Exception:
+            pass
+
+    def _on_resize(_event):
+        try:
+            fig.tight_layout(**tight_kwargs)
+        except Exception:
+            pass
+
+    try:
+        fig._tight_resize_cid = fig.canvas.mpl_connect("resize_event", _on_resize)
+    except Exception:
+        fig._tight_resize_cid = None
+
+
 # ── Dashboard charts ──────────────────────────────────────────
 
 def loyalty_histogram(scores, fig: Figure):
@@ -129,7 +163,7 @@ def segment_pie(labels, sizes, fig: Figure):
 
     ax.set_title("Segment Dagilimi", fontsize=14, fontweight="bold",
                  color=_TEXT, pad=16)
-    fig.tight_layout(pad=2.0, rect=[0.02, 0.02, 0.62, 0.98])
+    _apply_tight_layout(fig, pad=2.0, rect=[0.02, 0.02, 0.62, 0.98])
 
 
 # ── Segmentation view charts ─────────────────────────────────
@@ -189,7 +223,7 @@ def segment_rfm_bar(seg_stats, fig: Figure):
 
     fig.suptitle("Segment Bazli Ortalama RFM", fontsize=14,
                  fontweight="bold", color=_TEXT, y=0.995, x=0.02, ha="left")
-    fig.tight_layout(pad=2.0, h_pad=2.8, rect=[0, 0, 1, 0.955])
+    _apply_tight_layout(fig, pad=2.0, h_pad=2.8, rect=[0, 0, 1, 0.955])
 
 
 def segment_scatter(frequency, monetary, segment_labels, fig: Figure):
@@ -229,7 +263,7 @@ def segment_scatter(frequency, monetary, segment_labels, fig: Figure):
 
     ax.grid(alpha=0.3, color=_GRID, linewidth=0.5)
     ax.set_axisbelow(True)
-    fig.tight_layout(pad=2.0, rect=[0.01, 0.01, 0.82, 0.99])
+    _apply_tight_layout(fig, pad=2.0, rect=[0.01, 0.01, 0.82, 0.99])
 
 
 # ── Churn / Prediction view charts ───────────────────────────

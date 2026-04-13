@@ -156,13 +156,10 @@ class DashboardView(QWidget):
         charts_row1.addWidget(self.scatter_canvas)
         self.main_layout.addLayout(charts_row1)
 
-        # Charts - row 2: pie (half width)
-        charts_row2 = QHBoxLayout()
-        charts_row2.setSpacing(12)
-        self.pie_fig, self.pie_canvas = create_canvas(6, 3.8)
-        charts_row2.addWidget(self.pie_canvas)
-        charts_row2.addStretch()
-        self.main_layout.addLayout(charts_row2)
+        # Charts - row 2: pie (wider canvas so external legend fits)
+        self.pie_fig, self.pie_canvas = create_canvas(9, 4.2)
+        self.pie_canvas.setMinimumHeight(360)
+        self.main_layout.addWidget(self.pie_canvas)
         self.main_layout.addStretch()
 
         scroll.setWidget(container)
