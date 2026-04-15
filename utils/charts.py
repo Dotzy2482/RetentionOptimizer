@@ -119,7 +119,7 @@ def rfm_scatter(frequency, monetary, recency, fig: Figure):
     _style_ax(ax)
     scatter = ax.scatter(
         frequency, monetary,
-        c=recency, cmap="PuRd", alpha=0.55, s=16, edgecolors="none",
+        c=recency, cmap="plasma", alpha=0.70, s=18, edgecolors="none",
     )
     cbar = fig.colorbar(scatter, ax=ax, shrink=0.85, pad=0.02)
     cbar.set_label("Recency (gun)", fontsize=9, color=_TEXT_SEC)

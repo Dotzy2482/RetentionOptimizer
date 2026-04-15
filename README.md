@@ -24,35 +24,27 @@ python main.py
 
 ## Ozellikler
 
-### Sprint 1 - Altyapi
+### Sprint 1 - Altyapi (Tamamlandi)
 - Proje iskeleti ve klasor yapisi
 - SQLAlchemy ORM ile veritabani katmani (customers, transactions, rfm_scores, segments)
-- Excel/CSV veri import servisi
-- PyQt6 ana pencere iskeleti
+- Excel/CSV veri import servisi (5 asamali pipeline: okuma → temizleme → DB → RFM → skorlama)
+- PyQt6 ana pencere iskeleti, ozel NavButton ve SplashScreen
 
-### Sprint 2 - Analiz ve Dashboard
-- Progress bar ile veri yukleme
+### Sprint 2 - Analiz, ML ve Tam Uygulama (Tamamlandi)
+- Progress bar ile veri yukleme (animasyonlu 5-adim ilerleme cubugu)
 - RFM analizi (Recency, Frequency, Monetary) ve 1-5 skorlama
 - Loyalty score hesaplama (agirlikli formul, 0-100 olcek)
-- Dashboard: istatistik kartlari, histogram, scatter plot, pie chart
-- Musteri listesi: arama, filtreleme, sayfalama, detay karti
-
-### Sprint 3 - ML ve Segmentasyon
-- K-Means musteri segmentasyonu (k=4)
-- XGBoost churn tahmin modeli
-- Segmentasyon gorunumu: ozet tablo, 3 grafik, filtreleme
-- Tahminleme gorunumu: model metrikleri, feature importance, risk tablosu
-- Tam pipeline entegrasyonu (QThread ile arka plan isleme)
-
-### Sprint 4 - Export, Polish ve Paketleme
-- iOS 26 Liquid Glass tasarim dili (tamamen yeni UI temasi)
+- Dashboard: 4 istatistik karti, sadakat histogram, RFM scatter plot, segment pie chart
+- Musteri listesi: arama, filtreleme, sayfalama (100 satir/sayfa), detay karti
+- K-Means musteri segmentasyonu (k=4): Low Engagement / At Risk / Active / High Value Loyal
+- XGBoost churn tahmin modeli: risk skorlama, feature importance, model metrikleri
+- Segmentasyon gorunumu: pasta grafigi, RFM cubuk grafigi, scatter plot, filtreleme
+- Tahminleme gorunumu: model metrikleri, feature importance, renk kodlu risk tablosu
 - Excel export (openpyxl ile stilize edilmis rapor)
 - PDF export (matplotlib ile dashboard ozeti)
-- Bos veritabani, tekrar import, bozuk dosya edge case'leri
-- Hakkinda dialog'u
-- Splash screen
-- pytest test suite (17 test)
-- PyInstaller ile exe paketleme
+- Splash screen ve Hakkinda dialog'u
+- pytest test suite (17 test: RFM, skorlama, segmentasyon)
+- PyInstaller ile Windows exe paketleme
 
 ## Kullanim
 
@@ -114,4 +106,4 @@ RetentionOptimizer/
 
 ## Metodoloji
 
-Agile (Sprint tabanli) gelistirme ile 4 sprint boyunca insa edilmistir.
+Agile (Sprint tabanli) gelistirme ile 2 sprint boyunca insa edilmistir.

@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QColor
 
 from data.database import engine
@@ -216,9 +216,9 @@ class SegmentationView(QWidget):
             return
 
         self._update_summary()
-        self._update_charts()
         self._update_filter_combo()
         self._on_filter_changed()
+        QTimer.singleShot(0, self._update_charts)
 
     def _update_summary(self):
         df = self._seg_df
