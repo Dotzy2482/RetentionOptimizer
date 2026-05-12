@@ -1,17 +1,102 @@
+# === GÜVENLİK - ASLA COMMIT ETME ===
+# Firebase credentials
+**/firebase_credentials.json
+**/firebase_credentials.json.json
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase_options.dart
+
+# Database (müşteri verisi)
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# Dataset (büyük + 3rd party data)
+**/datasets/*.xlsx
+**/datasets/*.csv
+**/data/online_retail*
+
+# === PYTHON ===
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
 *.egg-info/
 dist/
 build/
-*.db
-*.sqlite
-.venv/
-venv/
-.env
-*.xlsx
-*.csv
+.pytest_cache/
+.coverage
+htmlcov/
+
+# === FLUTTER / DART ===
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_*.png
+linked_*.ds
+unlinked.ds
+unlinked_spec.ds
+
+# === ANDROID ===
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
+**/android/.gradle
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/key.properties
+
+# === iOS ===
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Generated.xcconfig
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# === IDE ===
 .idea/
 .vscode/
-models/trained/*.joblib
+*.iml
+*.iws
+*.ipr
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# === ML MODELLERİ ===
+**/models/*.pkl
+**/models/*.joblib
+**/models/*.h5
+
+# === LOGS ===
+*.log
+logs/
+
+# === ENV ===
+.env
+.env.local
+.env.*.local
+
+# === PYINSTALLER BUILD ===
+**/dist/
+**/build/
 *.spec.bak
-.pytest_cache/
+
+# === GRADLE ===
+.gradle/
+
+# === CLAUDE CODE ===
+.claude/
