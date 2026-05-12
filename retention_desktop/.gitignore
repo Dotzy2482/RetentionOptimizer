@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.db
+*.sqlite
+.venv/
+venv/
+.env
+*.xlsx
+*.csv
+.idea/
+.vscode/
+models/trained/*.joblib
+*.spec.bak
+.pytest_cache/
