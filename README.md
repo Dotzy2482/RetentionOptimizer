@@ -100,12 +100,6 @@ scripts\start_all.bat       - starts both (mobile emulator separate)
 - Sprint 2: Clustering + churn prediction
 - Sprint 3: Mobile app + Backend API + FCM integration
 
-## Team
-
-- Developer: Sarp
-- Product Owner: Gamze Bargan
-- Scrum Master: Erva
-
 ## License
 
 MIT - see LICENSE
